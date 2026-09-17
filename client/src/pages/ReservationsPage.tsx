@@ -20,15 +20,28 @@ export function ReservationsPage() {
   const [modal, setModal] = useState<"add" | Reservation | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const { data: shifts } = useQuery<Shift[]>({
+  const {
+    data: shifts,
+    isLoading: shiftsLoading,
+    isError: shiftsError,
+  } = useQuery<Shift[]>({
     queryKey: ["shifts"],
     queryFn: () => api.get("/shifts").then((res) => res.data),
   });
 
-  const { data: reservations, isLoading, isError } = useQuery<Reservation[]>({
+  const {
+    data: reservations,
+    isLoading: reservationsLoading,
+    isError: reservationsError,
+  } = useQuery<Reservation[]>({
     queryKey: ["reservations", date],
     queryFn: () => api.get("/reservations", { params: { date } }).then((res) => res.data),
   });
+
+  // Both queries feed the same timeline — show one combined loading/error state rather than
+  // flashing "no reservations" while shifts (which the slots themselves depend on) is still in flight.
+  const isLoading = shiftsLoading || reservationsLoading;
+  const isError = shiftsError || reservationsError;
 
   const slots = useMemo(() => {
     if (!shifts || shifts.length === 0) return [];
@@ -97,11 +110,11 @@ export function ReservationsPage() {
 
       {isLoading && <div className="text-sm text-gray-500">Loading reservations...</div>}
       {isError && <div className="text-sm text-red-600">Failed to load reservations.</div>}
-      {shifts && shifts.length === 0 && (
+      {!isLoading && !isError && shifts && shifts.length === 0 && (
         <div className="text-sm text-gray-500">No shifts are configured yet, so there's no timeline to show.</div>
       )}
 
-      {slots.length > 0 && (
+      {!isLoading && !isError && slots.length > 0 && (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
           {slots.map((slot) => {
             const items = reservationsBySlot.get(slot) ?? [];

@@ -19,14 +19,20 @@ interface Props {
   table: RestaurantTable;
   draggable: boolean;
   onClick?: () => void;
+  // The canvas may be CSS-scaled down to fit a tablet-width screen (see FloorPlanPage). dnd-kit's
+  // translate is in real screen pixels, which the ancestor's scale() would otherwise compress —
+  // so we inflate it here to cancel that out and keep the drag tracking the cursor 1:1.
+  scale?: number;
 }
 
-export function TableCard({ table, draggable, onClick }: Props) {
+export function TableCard({ table, draggable, onClick, scale = 1 }: Props) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: table.id,
     disabled: !draggable,
   });
   const { width, height } = sizeFor(table.capacity, table.shape);
+
+  const adjustedTransform = transform && scale !== 1 ? { ...transform, x: transform.x / scale, y: transform.y / scale } : transform;
 
   const style: React.CSSProperties = {
     position: "absolute",
@@ -34,7 +40,7 @@ export function TableCard({ table, draggable, onClick }: Props) {
     top: table.positionY,
     width,
     height,
-    transform: CSS.Translate.toString(transform),
+    transform: CSS.Translate.toString(adjustedTransform),
     zIndex: isDragging ? 10 : 1,
   };
 

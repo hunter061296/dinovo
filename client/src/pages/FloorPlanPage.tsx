@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
-import { restrictToParentElement } from "@dnd-kit/modifiers";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
 import { getSocket } from "../lib/socket";
@@ -26,6 +25,22 @@ export function FloorPlanPage() {
   const [formModal, setFormModal] = useState<"add" | RestaurantTable | null>(null);
   const [statusTable, setStatusTable] = useState<RestaurantTable | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // On a tablet-width screen the 900px canvas is wider than the viewport — rather than force
+  // horizontal scrolling to see the rest of the floor plan, scale the whole canvas down to fit.
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      setScale(Math.min(1, entry.contentRect.width / CANVAS_WIDTH));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+    // `tables` starts undefined while the query is loading, and the ref-bearing div only
+    // renders once it resolves — re-run so the observer actually attaches once that div exists.
+  }, [tables]);
 
   // Keeps every open host-stand screen in sync — a status change made on one iPad shows up
   // on all the others without anyone refreshing.
@@ -109,8 +124,10 @@ export function FloorPlanPage() {
   function handleDragEnd(event: DragEndEvent) {
     const table = tables?.find((t) => t.id === event.active.id);
     if (!table) return;
-    const nextX = Math.max(0, Math.min(CANVAS_WIDTH - 60, table.positionX + event.delta.x));
-    const nextY = Math.max(0, Math.min(CANVAS_HEIGHT - 60, table.positionY + event.delta.y));
+    // Pointer movement is in screen pixels, but table positions live in unscaled canvas
+    // coordinates — divide out the scale so dragging feels 1:1 even when the canvas is shrunk.
+    const nextX = Math.max(0, Math.min(CANVAS_WIDTH - 60, table.positionX + event.delta.x / scale));
+    const nextY = Math.max(0, Math.min(CANVAS_HEIGHT - 60, table.positionY + event.delta.y / scale));
     moveTable.mutate({ id: table.id, positionX: nextX, positionY: nextY });
   }
 
@@ -137,29 +154,35 @@ export function FloorPlanPage() {
       {isLoading && <div className="text-sm text-gray-500">Loading floor plan...</div>}
       {isError && <div className="text-sm text-red-600">Failed to load the floor plan.</div>}
 
+      {/* No restrictToParentElement modifier here — it measures the parent's scaled screen rect,
+          which doesn't line up with the child's own (unscaled) transform space once the canvas
+          is shrunk to fit a tablet. handleDragEnd already clamps to canvas bounds on drop. */}
       {tables && (
-        <DndContext sensors={sensors} onDragEnd={handleDragEnd} modifiers={[restrictToParentElement]}>
-          <div
-            className="relative overflow-auto rounded-lg border border-gray-200 bg-gray-50"
-            style={{ width: "100%", maxWidth: CANVAS_WIDTH + 40, height: CANVAS_HEIGHT, padding: 20 }}
-          >
-            <div
-              className="relative"
-              style={{
-                width: CANVAS_WIDTH,
-                height: Math.max(CANVAS_HEIGHT - 40, ...tables.map((t) => t.positionY + 220), 200),
-              }}
-            >
-              {tables.length === 0 && (
-                <div className="flex h-full items-center justify-center text-sm text-gray-400">
-                  No tables yet. {canEdit && 'Click "Add table" to build your floor plan.'}
+        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+          {(() => {
+            const canvasHeight = Math.max(CANVAS_HEIGHT - 40, ...tables.map((t) => t.positionY + 220), 200);
+            return (
+              <div
+                ref={containerRef}
+                className="relative overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
+                style={{ width: "100%", maxWidth: CANVAS_WIDTH + 40, height: canvasHeight * scale + 40, padding: 20 }}
+              >
+                <div
+                  className="relative origin-top-left"
+                  style={{ width: CANVAS_WIDTH, height: canvasHeight, transform: `scale(${scale})` }}
+                >
+                  {tables.length === 0 && (
+                    <div className="flex h-full items-center justify-center text-sm text-gray-400">
+                      No tables yet. {canEdit && 'Click "Add table" to build your floor plan.'}
+                    </div>
+                  )}
+                  {tables.map((table) => (
+                    <TableCard key={table.id} table={table} draggable={canEdit} scale={scale} onClick={() => setStatusTable(table)} />
+                  ))}
                 </div>
-              )}
-              {tables.map((table) => (
-                <TableCard key={table.id} table={table} draggable={canEdit} onClick={() => setStatusTable(table)} />
-              ))}
-            </div>
-          </div>
+              </div>
+            );
+          })()}
         </DndContext>
       )}
 
