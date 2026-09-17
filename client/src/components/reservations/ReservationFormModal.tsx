@@ -1,9 +1,10 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import type { RestaurantTable } from "../../lib/tables";
-import type { Reservation, ReservationStatus } from "../../lib/reservations";
+import type { Reservation, ReservationStatus, Shift } from "../../lib/reservations";
 import { STATUS_LABELS } from "../../lib/reservations";
+import { coversInSlot, findPacingRule } from "../../lib/pacing";
 import { GuestPicker, type NewGuestInput } from "./GuestPicker";
 
 export interface ReservationFormValues {
@@ -18,6 +19,8 @@ export interface ReservationFormValues {
 
 interface Props {
   date: string; // YYYY-MM-DD, used to default the time field
+  shifts: Shift[];
+  reservationsThatDay: Reservation[];
   initial?: Reservation;
   onSubmit: (values: ReservationFormValues) => void;
   onCancelReservation?: () => void;
@@ -31,7 +34,17 @@ function toTimeInputValue(iso: string) {
   return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
 
-export function ReservationFormModal({ date, initial, onSubmit, onCancelReservation, onClose, submitting, error }: Props) {
+export function ReservationFormModal({
+  date,
+  shifts,
+  reservationsThatDay,
+  initial,
+  onSubmit,
+  onCancelReservation,
+  onClose,
+  submitting,
+  error,
+}: Props) {
   const [guest, setGuest] = useState(initial?.guest ?? null);
   const [newGuest, setNewGuest] = useState<NewGuestInput | null>(null);
   const [partySize, setPartySize] = useState(initial?.partySize?.toString() ?? "2");
@@ -44,6 +57,29 @@ export function ReservationFormModal({ date, initial, onSubmit, onCancelReservat
     queryKey: ["tables"],
     queryFn: () => api.get("/tables").then((res) => res.data),
   });
+
+  // Non-blocking pacing check: warn if this booking would push the slot over its configured
+  // cover cap or exceed the slot's max party size, but never prevent saving.
+  const pacingWarning = useMemo(() => {
+    const [hours, minutes] = time.split(":").map(Number);
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+    const slot = hours * 60 + minutes - ((hours * 60 + minutes) % 30);
+    const rule = findPacingRule(shifts, slot);
+    if (!rule) return null;
+
+    const size = Number(partySize) || 0;
+    const existingCovers = coversInSlot(reservationsThatDay, slot, initial?.id);
+    const projected = existingCovers + size;
+
+    const messages: string[] = [];
+    if (projected > rule.maxCovers) {
+      messages.push(`This slot would have ${projected}/${rule.maxCovers} covers.`);
+    }
+    if (size > rule.maxPartySize) {
+      messages.push(`Party size ${size} exceeds this slot's max of ${rule.maxPartySize}.`);
+    }
+    return messages.length > 0 ? messages.join(" ") : null;
+  }, [time, partySize, shifts, reservationsThatDay, initial?.id]);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -70,6 +106,9 @@ export function ReservationFormModal({ date, initial, onSubmit, onCancelReservat
         <h2 className="mb-4 text-lg font-semibold text-gray-900">{initial ? "Edit reservation" : "New reservation"}</h2>
 
         {error && <div className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+        {pacingWarning && (
+          <div className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">⚠ {pacingWarning}</div>
+        )}
 
         <div className="mb-3">
           <span className="mb-1 block text-sm font-medium text-gray-700">Guest</span>

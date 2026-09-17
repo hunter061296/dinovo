@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import type { Shift } from "../lib/reservations";
 import { STATUS_LABELS, STATUS_STYLES, minutesToLabel } from "../lib/reservations";
 import type { Reservation } from "../lib/reservations";
+import { coversInSlot, findPacingRule } from "../lib/pacing";
 import { ReservationFormModal, type ReservationFormValues } from "../components/reservations/ReservationFormModal";
 
 const SLOT_MINUTES = 30;
@@ -104,10 +105,18 @@ export function ReservationsPage() {
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
           {slots.map((slot) => {
             const items = reservationsBySlot.get(slot) ?? [];
+            const rule = shifts ? findPacingRule(shifts, slot) : undefined;
+            const covers = reservations ? coversInSlot(reservations, slot) : 0;
+            const overCap = rule && covers > rule.maxCovers;
             return (
-              <div key={slot} className="flex border-t border-gray-100 first:border-t-0">
+              <div key={slot} className={`flex border-t border-gray-100 first:border-t-0 ${overCap ? "bg-amber-50" : ""}`}>
                 <div className="w-24 shrink-0 border-r border-gray-100 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-500">
                   {minutesToLabel(slot)}
+                  {rule && (
+                    <div className={overCap ? "font-semibold text-amber-700" : "text-gray-400"}>
+                      {covers}/{rule.maxCovers} covers{overCap ? " ⚠" : ""}
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-1 flex-wrap gap-2 p-2">
                   {items.length === 0 ? (
@@ -138,6 +147,8 @@ export function ReservationsPage() {
       {modal && (
         <ReservationFormModal
           date={date}
+          shifts={shifts ?? []}
+          reservationsThatDay={reservations ?? []}
           initial={modal === "add" ? undefined : modal}
           submitting={createReservation.isPending || updateReservation.isPending}
           error={formError}

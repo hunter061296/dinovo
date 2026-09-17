@@ -16,12 +16,21 @@ export interface Guest {
   reservations?: { dateTime: string; status: ReservationStatus }[];
 }
 
+export interface PacingRule {
+  id: string;
+  shiftId: string;
+  timeSlotMinutes: number;
+  maxCovers: number;
+  maxPartySize: number;
+}
+
 export interface Shift {
   id: string;
   name: string;
   dayOfWeek: number;
   startMinutes: number;
   endMinutes: number;
+  pacingRules: PacingRule[];
 }
 
 export interface Reservation {

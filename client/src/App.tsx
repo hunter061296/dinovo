@@ -10,6 +10,7 @@ import { ReservationsPage } from "./pages/ReservationsPage";
 import { WaitlistPage } from "./pages/WaitlistPage";
 import { GuestbookPage } from "./pages/GuestbookPage";
 import { GuestProfilePage } from "./pages/GuestProfilePage";
+import { ShiftsPage } from "./pages/ShiftsPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 
 export default function App() {
@@ -29,7 +30,7 @@ export default function App() {
               <Route path="/guests/:id" element={<GuestProfilePage />} />
 
               <Route element={<ProtectedRoute roles={["ADMIN", "MANAGER"]} />}>
-                <Route path="/shifts" element={<PlaceholderPage title="Shifts & Pacing" phase="Phase 8" />} />
+                <Route path="/shifts" element={<ShiftsPage />} />
                 <Route path="/reports" element={<PlaceholderPage title="Reports" phase="Phase 9" />} />
               </Route>
 
