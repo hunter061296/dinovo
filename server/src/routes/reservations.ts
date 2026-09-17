@@ -1,0 +1,123 @@
+import { Router } from "express";
+import { z } from "zod";
+import { ReservationStatus } from "@prisma/client";
+import { prisma } from "../lib/prisma";
+import { authenticate } from "../middleware/auth";
+import { findShiftForDateTime } from "../lib/shiftMatch";
+
+const router = Router();
+
+router.use(authenticate);
+
+const include = { guest: true, table: true, shift: true } as const;
+
+router.get("/", async (req, res) => {
+  const dateParam = typeof req.query.date === "string" ? req.query.date : null;
+  if (!dateParam || !/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+    return res.status(400).json({ error: "date query param is required (YYYY-MM-DD)" });
+  }
+  const start = new Date(`${dateParam}T00:00:00`);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+
+  const reservations = await prisma.reservation.findMany({
+    where: { dateTime: { gte: start, lt: end } },
+    include,
+    orderBy: { dateTime: "asc" },
+  });
+  res.json(reservations);
+});
+
+const newGuestSchema = z.object({
+  firstName: z.string().min(1),
+  lastName: z.string().min(1),
+  phone: z.string().optional(),
+  email: z.string().email().optional().or(z.literal("")),
+});
+
+const createReservationSchema = z
+  .object({
+    guestId: z.string().uuid().optional(),
+    newGuest: newGuestSchema.optional(),
+    partySize: z.number().int().positive(),
+    dateTime: z.coerce.date(),
+    tableId: z.string().uuid().nullable().optional(),
+    notes: z.string().optional(),
+  })
+  .refine((data) => data.guestId || data.newGuest, {
+    message: "Either guestId or newGuest is required",
+  });
+
+router.post("/", async (req, res) => {
+  const parsed = createReservationSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+  const { partySize, dateTime, tableId, notes } = parsed.data;
+
+  let guestId = parsed.data.guestId;
+  if (!guestId && parsed.data.newGuest) {
+    const g = parsed.data.newGuest;
+    const guest = await prisma.guest.create({
+      data: { firstName: g.firstName, lastName: g.lastName, phone: g.phone || null, email: g.email || null },
+    });
+    guestId = guest.id;
+  }
+
+  const shift = await findShiftForDateTime(dateTime);
+
+  const reservation = await prisma.reservation.create({
+    data: {
+      guestId: guestId!,
+      partySize,
+      dateTime,
+      tableId: tableId || null,
+      shiftId: shift?.id,
+      notes,
+      createdById: req.user!.sub,
+    },
+    include,
+  });
+  res.status(201).json(reservation);
+});
+
+const updateReservationSchema = z.object({
+  partySize: z.number().int().positive().optional(),
+  dateTime: z.coerce.date().optional(),
+  tableId: z.string().uuid().nullable().optional(),
+  notes: z.string().optional(),
+  status: z.nativeEnum(ReservationStatus).optional(),
+});
+
+router.patch("/:id", async (req, res) => {
+  const parsed = updateReservationSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+
+  const data: Record<string, unknown> = { ...parsed.data };
+
+  // Re-resolve the shift whenever the time changes, so pacing/reporting stay accurate.
+  if (parsed.data.dateTime) {
+    const shift = await findShiftForDateTime(parsed.data.dateTime);
+    data.shiftId = shift?.id ?? null;
+  }
+  if (parsed.data.status === "SEATED") {
+    data.seatedAt = new Date();
+  }
+  if (parsed.data.status === "COMPLETED" || parsed.data.status === "NO_SHOW" || parsed.data.status === "CANCELLED") {
+    data.completedAt = new Date();
+  }
+
+  try {
+    const reservation = await prisma.reservation.update({
+      where: { id: req.params.id },
+      data,
+      include,
+    });
+    res.json(reservation);
+  } catch {
+    res.status(404).json({ error: "Reservation not found" });
+  }
+});
+
+export default router;

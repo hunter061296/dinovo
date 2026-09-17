@@ -6,6 +6,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { UsersPage } from "./pages/UsersPage";
 import { FloorPlanPage } from "./pages/FloorPlanPage";
+import { ReservationsPage } from "./pages/ReservationsPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 
 export default function App() {
@@ -19,7 +20,7 @@ export default function App() {
             <Route element={<Layout />}>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/floor-plan" element={<FloorPlanPage />} />
-              <Route path="/reservations" element={<PlaceholderPage title="Reservation Book" phase="Phase 4" />} />
+              <Route path="/reservations" element={<ReservationsPage />} />
               <Route path="/waitlist" element={<PlaceholderPage title="Waitlist" phase="Phase 6" />} />
               <Route path="/guests" element={<PlaceholderPage title="Guestbook" phase="Phase 7" />} />
 
