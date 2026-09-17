@@ -9,4 +9,21 @@ export interface RestaurantTable {
   positionX: number;
   positionY: number;
   status: TableStatus;
+  statusUpdatedAt: string;
+  sectionId: string | null;
+}
+
+export interface Section {
+  id: string;
+  name: string;
+  position: number;
+}
+
+export interface SeatedSummaryEntry {
+  tableId: string;
+  tableNumber: number;
+  capacity: number;
+  statusUpdatedAt: string;
+  guestName: string | null;
+  partySize: number | null;
 }

@@ -1,23 +1,25 @@
 import { useState, type FormEvent } from "react";
-import type { RestaurantTable, TableShape } from "../../lib/tables";
+import type { RestaurantTable, Section, TableShape } from "../../lib/tables";
 
 interface Props {
   initial?: RestaurantTable;
-  onSubmit: (data: { number: number; capacity: number; shape: TableShape }) => void;
+  sections: Section[];
+  onSubmit: (data: { number: number; capacity: number; shape: TableShape; sectionId: string | null }) => void;
   onDelete?: () => void;
   onClose: () => void;
   submitting?: boolean;
   error?: string | null;
 }
 
-export function TableFormModal({ initial, onSubmit, onDelete, onClose, submitting, error }: Props) {
+export function TableFormModal({ initial, sections, onSubmit, onDelete, onClose, submitting, error }: Props) {
   const [number, setNumber] = useState(initial?.number?.toString() ?? "");
   const [capacity, setCapacity] = useState(initial?.capacity?.toString() ?? "2");
   const [shape, setShape] = useState<TableShape>(initial?.shape ?? "SQUARE");
+  const [sectionId, setSectionId] = useState(initial?.sectionId ?? "");
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    onSubmit({ number: Number(number), capacity: Number(capacity), shape });
+    onSubmit({ number: Number(number), capacity: Number(capacity), shape, sectionId: sectionId || null });
   }
 
   return (
@@ -49,7 +51,7 @@ export function TableFormModal({ initial, onSubmit, onDelete, onClose, submittin
             className="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
           />
         </label>
-        <label className="mb-5 block text-sm">
+        <label className="mb-3 block text-sm">
           <span className="mb-1 block font-medium text-gray-700 dark:text-gray-300">Shape</span>
           <select
             value={shape}
@@ -59,6 +61,21 @@ export function TableFormModal({ initial, onSubmit, onDelete, onClose, submittin
             <option value="ROUND">Round</option>
             <option value="SQUARE">Square</option>
             <option value="RECTANGLE">Rectangle</option>
+          </select>
+        </label>
+        <label className="mb-5 block text-sm">
+          <span className="mb-1 block font-medium text-gray-700 dark:text-gray-300">Section</span>
+          <select
+            value={sectionId}
+            onChange={(e) => setSectionId(e.target.value)}
+            className="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+          >
+            <option value="">No section</option>
+            {sections.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
           </select>
         </label>
 

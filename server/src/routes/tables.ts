@@ -15,12 +15,56 @@ router.get("/", async (_req, res) => {
   res.json(tables);
 });
 
+// Powers the "Currently Seated" panel. A seated table's occupant might be a reservation, a
+// waitlist walk-in, or (if a host just clicked "Seated" directly) neither — best-effort name
+// lookup, falling back to null rather than guessing.
+router.get("/seated-summary", async (_req, res) => {
+  const tables = await prisma.restaurantTable.findMany({
+    where: { status: "SEATED" },
+    orderBy: { statusUpdatedAt: "asc" },
+  });
+  if (tables.length === 0) {
+    return res.json([]);
+  }
+
+  const tableIds = tables.map((t) => t.id);
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+
+  const [reservations, waitlistEntries] = await Promise.all([
+    prisma.reservation.findMany({
+      where: { tableId: { in: tableIds }, status: "SEATED", dateTime: { gte: todayStart, lt: todayEnd } },
+      include: { guest: true },
+    }),
+    prisma.waitlistEntry.findMany({
+      where: { seatedTableId: { in: tableIds }, status: "SEATED" },
+    }),
+  ]);
+
+  const summary = tables.map((t) => {
+    const reservation = reservations.find((r) => r.tableId === t.id);
+    const waitlistEntry = waitlistEntries.find((w) => w.seatedTableId === t.id);
+    return {
+      tableId: t.id,
+      tableNumber: t.number,
+      capacity: t.capacity,
+      statusUpdatedAt: t.statusUpdatedAt,
+      guestName: reservation ? `${reservation.guest.firstName} ${reservation.guest.lastName}` : (waitlistEntry?.guestName ?? null),
+      partySize: reservation?.partySize ?? waitlistEntry?.partySize ?? null,
+    };
+  });
+
+  res.json(summary);
+});
+
 const createTableSchema = z.object({
   number: z.number().int().positive(),
   capacity: z.number().int().positive(),
   shape: z.nativeEnum(TableShape),
   positionX: z.number().default(20),
   positionY: z.number().default(20),
+  sectionId: z.string().uuid().nullable().optional(),
 });
 
 router.post("/", authorize("ADMIN", "MANAGER"), async (req, res) => {
@@ -45,6 +89,7 @@ const updateTableSchema = z.object({
   shape: z.nativeEnum(TableShape).optional(),
   positionX: z.number().optional(),
   positionY: z.number().optional(),
+  sectionId: z.string().uuid().nullable().optional(),
 });
 
 router.patch("/:id", authorize("ADMIN", "MANAGER"), async (req, res) => {
@@ -79,7 +124,10 @@ router.patch("/:id/status", async (req, res) => {
     return res.status(400).json({ error: parsed.error.issues[0].message });
   }
   try {
-    const table = await prisma.restaurantTable.update({ where: { id: req.params.id }, data: { status: parsed.data.status } });
+    const table = await prisma.restaurantTable.update({
+      where: { id: req.params.id },
+      data: { status: parsed.data.status, statusUpdatedAt: new Date() },
+    });
     getIO().emit("table:updated", table);
     res.json(table);
   } catch {

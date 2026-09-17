@@ -62,17 +62,37 @@ model User {
   @@map("users")
 }
 
+// Named floor areas (Patio, Bar, Main Dining, ...) a table can belong to. Optional — a table
+// with no section just shows up under "All tables".
+model Section {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tables RestaurantTable[]
+
+  @@map("sections")
+}
+
 // The floor plan. "RestaurantTable" avoids clashing with the SQL keyword TABLE.
 model RestaurantTable {
-  id        String      @id @default(uuid())
-  number    Int         @unique
-  capacity  Int
-  shape     TableShape  @default(SQUARE)
-  positionX Float       @default(0)
-  positionY Float       @default(0)
-  status    TableStatus @default(OPEN)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id              String      @id @default(uuid())
+  number          Int         @unique
+  capacity        Int
+  shape           TableShape  @default(SQUARE)
+  positionX       Float       @default(0)
+  positionY       Float       @default(0)
+  status          TableStatus @default(OPEN)
+  // Set explicitly whenever `status` changes (not on every edit — repositioning a table during
+  // layout work shouldn't reset how long it's been "Seated"). Powers the live elapsed-time badge
+  // and the Currently Seated panel.
+  statusUpdatedAt DateTime    @default(now())
+  sectionId       String?
+  section         Section?    @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   reservations     Reservation[]
   waitlistSeatings WaitlistEntry[]

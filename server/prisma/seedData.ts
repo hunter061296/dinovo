@@ -14,6 +14,7 @@ export async function seedDatabase(prisma: PrismaClient) {
   await prisma.shift.deleteMany();
   await prisma.guest.deleteMany();
   await prisma.restaurantTable.deleteMany();
+  await prisma.section.deleteMany();
   await prisma.user.deleteMany();
 
   // ---------- Users ----------
@@ -29,28 +30,43 @@ export async function seedDatabase(prisma: PrismaClient) {
     data: { email: "host@dinovo.test", passwordHash, name: "Harper Host", role: "HOST" },
   });
 
+  // ---------- Floor plan sections ----------
+  console.log("Seeding sections...");
+  const [barSection, mainSection, patioSection] = await Promise.all([
+    prisma.section.create({ data: { name: "Bar", position: 0 } }),
+    prisma.section.create({ data: { name: "Main Dining", position: 1 } }),
+    prisma.section.create({ data: { name: "Patio", position: 2 } }),
+  ]);
+
   // ---------- Floor plan (14 tables, varied sizes/shapes, laid out on a grid) ----------
   console.log("Seeding floor plan...");
-  const tableDefs: { number: number; capacity: number; shape: TableShape; x: number; y: number }[] = [
-    { number: 1, capacity: 2, shape: "ROUND", x: 60, y: 60 },
-    { number: 2, capacity: 2, shape: "ROUND", x: 180, y: 60 },
-    { number: 3, capacity: 2, shape: "SQUARE", x: 300, y: 60 },
-    { number: 4, capacity: 4, shape: "SQUARE", x: 60, y: 180 },
-    { number: 5, capacity: 4, shape: "SQUARE", x: 180, y: 180 },
-    { number: 6, capacity: 4, shape: "ROUND", x: 300, y: 180 },
-    { number: 7, capacity: 4, shape: "ROUND", x: 420, y: 180 },
-    { number: 8, capacity: 6, shape: "RECTANGLE", x: 60, y: 320 },
-    { number: 9, capacity: 6, shape: "RECTANGLE", x: 220, y: 320 },
-    { number: 10, capacity: 8, shape: "RECTANGLE", x: 420, y: 320 },
-    { number: 11, capacity: 2, shape: "SQUARE", x: 420, y: 60 },
-    { number: 12, capacity: 4, shape: "SQUARE", x: 540, y: 180 },
-    { number: 13, capacity: 2, shape: "ROUND", x: 540, y: 60 },
-    { number: 14, capacity: 10, shape: "RECTANGLE", x: 620, y: 320 },
+  const tableDefs: { number: number; capacity: number; shape: TableShape; x: number; y: number; section: string }[] = [
+    { number: 1, capacity: 2, shape: "ROUND", x: 60, y: 60, section: barSection.id },
+    { number: 2, capacity: 2, shape: "ROUND", x: 180, y: 60, section: barSection.id },
+    { number: 3, capacity: 2, shape: "SQUARE", x: 300, y: 60, section: barSection.id },
+    { number: 4, capacity: 4, shape: "SQUARE", x: 60, y: 180, section: mainSection.id },
+    { number: 5, capacity: 4, shape: "SQUARE", x: 180, y: 180, section: mainSection.id },
+    { number: 6, capacity: 4, shape: "ROUND", x: 300, y: 180, section: mainSection.id },
+    { number: 7, capacity: 4, shape: "ROUND", x: 420, y: 180, section: mainSection.id },
+    { number: 8, capacity: 6, shape: "RECTANGLE", x: 60, y: 320, section: patioSection.id },
+    { number: 9, capacity: 6, shape: "RECTANGLE", x: 220, y: 320, section: patioSection.id },
+    { number: 10, capacity: 8, shape: "RECTANGLE", x: 420, y: 320, section: patioSection.id },
+    { number: 11, capacity: 2, shape: "SQUARE", x: 420, y: 60, section: barSection.id },
+    { number: 12, capacity: 4, shape: "SQUARE", x: 540, y: 180, section: mainSection.id },
+    { number: 13, capacity: 2, shape: "ROUND", x: 540, y: 60, section: barSection.id },
+    { number: 14, capacity: 10, shape: "RECTANGLE", x: 620, y: 320, section: patioSection.id },
   ];
   const tables = await Promise.all(
     tableDefs.map((t) =>
       prisma.restaurantTable.create({
-        data: { number: t.number, capacity: t.capacity, shape: t.shape, positionX: t.x, positionY: t.y },
+        data: {
+          number: t.number,
+          capacity: t.capacity,
+          shape: t.shape,
+          positionX: t.x,
+          positionY: t.y,
+          sectionId: t.section,
+        },
       })
     )
   );

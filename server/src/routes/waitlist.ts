@@ -82,7 +82,7 @@ router.post("/:id/seat", async (req, res) => {
       where: { id: req.params.id },
       data: { status: "SEATED", seatedAt: new Date(), seatedTableId: table.id },
     }),
-    prisma.restaurantTable.update({ where: { id: table.id }, data: { status: "SEATED" } }),
+    prisma.restaurantTable.update({ where: { id: table.id }, data: { status: "SEATED", statusUpdatedAt: new Date() } }),
   ]);
 
   getIO().emit("waitlist:updated", entry);
