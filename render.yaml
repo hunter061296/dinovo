@@ -1,0 +1,58 @@
+# Render Blueprint — deploys the whole app from one repo.
+# Usage: Render dashboard -> New -> Blueprint -> point at this repo.
+#
+# Two web services + one Postgres database. The client and server are deployed
+# separately (rather than the server serving the built client) so each keeps
+# its own simple build/start command and Render's static-site CDN/caching.
+#
+# NOTE: deliberately no NODE_ENV=production anywhere below. npm skips
+# devDependencies on install when NODE_ENV=production, but typescript, the
+# prisma CLI, and tsx (used to build and to run migrations/seed at deploy
+# time) are all devDependencies here — setting it would break the build.
+#
+# NOTE: the service names below (dinovo-server / dinovo-client) determine the
+# *.onrender.com hostnames referenced in the env vars further down. If you
+# rename a service when creating the blueprint, update CLIENT_ORIGIN and
+# VITE_API_URL to match the actual assigned hostnames.
+
+databases:
+  - name: dinovo-db
+    plan: free
+    databaseName: dinovo
+    user: dinovo
+
+services:
+  - type: web
+    name: dinovo-server
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && npm run seed:if-empty && npm start
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: dinovo-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 12h
+      - key: CLIENT_ORIGIN
+        value: https://dinovo-client.onrender.com
+
+  - type: web
+    name: dinovo-client
+    runtime: static
+    rootDir: client
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://dinovo-server.onrender.com/api
+    routes:
+      # Client-side routing (React Router) — any path not matching a real static
+      # file falls back to index.html.
+      - type: rewrite
+        source: /*
+        destination: /index.html
