@@ -94,6 +94,11 @@ router.patch("/:id", async (req, res) => {
     return res.status(400).json({ error: parsed.error.issues[0].message });
   }
 
+  const existing = await prisma.reservation.findUnique({ where: { id: req.params.id } });
+  if (!existing) {
+    return res.status(404).json({ error: "Reservation not found" });
+  }
+
   const data: Record<string, unknown> = { ...parsed.data };
 
   // Re-resolve the shift whenever the time changes, so pacing/reporting stay accurate.
@@ -114,6 +119,14 @@ router.patch("/:id", async (req, res) => {
       data,
       include,
     });
+    // Visit count reflects guests who actually showed up, not just booked — increment only on
+    // the transition into COMPLETED so re-saving an already-completed reservation can't double-count.
+    if (parsed.data.status === "COMPLETED" && existing.status !== "COMPLETED") {
+      await prisma.guest.update({
+        where: { id: reservation.guestId },
+        data: { visitCount: { increment: 1 } },
+      });
+    }
     res.json(reservation);
   } catch {
     res.status(404).json({ error: "Reservation not found" });

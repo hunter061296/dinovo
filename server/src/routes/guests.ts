@@ -7,24 +7,31 @@ const router = Router();
 
 router.use(authenticate);
 
-// Used by the reservation form's guest search-or-create step. Full guestbook (tags, notes,
-// visit history) lands in Phase 7 — this is deliberately minimal.
+// Include just the most recent reservation so list views can show "last visit" without a
+// second round trip per guest.
+const withLastReservation = {
+  reservations: { orderBy: { dateTime: "desc" as const }, take: 1 },
+};
+
+// Used both by the reservation form's guest search-or-create step and the Guestbook directory
+// (browsing with no search term returns everyone, most recently added first).
 router.get("/", async (req, res) => {
   const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
-  if (!search) {
-    return res.json([]);
-  }
+
   const guests = await prisma.guest.findMany({
-    where: {
-      OR: [
-        { firstName: { contains: search, mode: "insensitive" } },
-        { lastName: { contains: search, mode: "insensitive" } },
-        { phone: { contains: search, mode: "insensitive" } },
-        { email: { contains: search, mode: "insensitive" } },
-      ],
-    },
-    orderBy: { lastName: "asc" },
-    take: 10,
+    where: search
+      ? {
+          OR: [
+            { firstName: { contains: search, mode: "insensitive" } },
+            { lastName: { contains: search, mode: "insensitive" } },
+            { phone: { contains: search, mode: "insensitive" } },
+            { email: { contains: search, mode: "insensitive" } },
+          ],
+        }
+      : undefined,
+    include: withLastReservation,
+    orderBy: search ? { lastName: "asc" } : { createdAt: "desc" },
+    take: search ? 10 : 100,
   });
   res.json(guests);
 });
@@ -46,6 +53,41 @@ router.post("/", async (req, res) => {
     data: { firstName, lastName, phone: phone || null, email: email || null },
   });
   res.status(201).json(guest);
+});
+
+router.get("/:id", async (req, res) => {
+  const guest = await prisma.guest.findUnique({
+    where: { id: req.params.id },
+    include: {
+      reservations: {
+        include: { table: true },
+        orderBy: { dateTime: "desc" },
+      },
+    },
+  });
+  if (!guest) {
+    return res.status(404).json({ error: "Guest not found" });
+  }
+  res.json(guest);
+});
+
+const updateGuestSchema = z.object({
+  tags: z.array(z.string().min(1)).optional(),
+  notes: z.string().optional(),
+});
+
+// Open to every role — Hosts and Managers both maintain the guestbook per the product brief.
+router.patch("/:id", async (req, res) => {
+  const parsed = updateGuestSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+  try {
+    const guest = await prisma.guest.update({ where: { id: req.params.id }, data: parsed.data });
+    res.json(guest);
+  } catch {
+    res.status(404).json({ error: "Guest not found" });
+  }
 });
 
 export default router;

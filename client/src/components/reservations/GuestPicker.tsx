@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import type { Guest } from "../../lib/reservations";
+import { GuestProfileCard } from "./GuestProfileCard";
 
 export interface NewGuestInput {
   firstName: string;
@@ -36,16 +37,13 @@ export function GuestPicker({ selectedGuest, onSelectGuest, newGuest, onChangeNe
 
   if (selectedGuest) {
     return (
-      <div className="flex items-center justify-between rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm">
-        <div>
-          <span className="font-medium text-gray-900">
-            {selectedGuest.firstName} {selectedGuest.lastName}
-          </span>
-          <span className="ml-2 text-gray-500">{selectedGuest.phone || selectedGuest.email || ""}</span>
+      <div>
+        <div className="mb-2 flex justify-end">
+          <button type="button" onClick={() => onSelectGuest(null)} className="text-xs font-medium text-indigo-600 hover:underline">
+            Change guest
+          </button>
         </div>
-        <button type="button" onClick={() => onSelectGuest(null)} className="text-xs font-medium text-indigo-600 hover:underline">
-          Change
-        </button>
+        <GuestProfileCard guest={selectedGuest} />
       </div>
     );
   }

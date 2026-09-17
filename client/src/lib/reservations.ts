@@ -11,6 +11,9 @@ export interface Guest {
   visitCount: number;
   tags: string[];
   notes: string | null;
+  // Present on search/list results (most recent reservation only) — absent when a Guest comes
+  // embedded in a Reservation, since that reservation already implies at least one visit.
+  reservations?: { dateTime: string; status: ReservationStatus }[];
 }
 
 export interface Shift {
