@@ -11,7 +11,7 @@ import { WaitlistPage } from "./pages/WaitlistPage";
 import { GuestbookPage } from "./pages/GuestbookPage";
 import { GuestProfilePage } from "./pages/GuestProfilePage";
 import { ShiftsPage } from "./pages/ShiftsPage";
-import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { ReportsPage } from "./pages/ReportsPage";
 
 export default function App() {
   return (
@@ -31,7 +31,7 @@ export default function App() {
 
               <Route element={<ProtectedRoute roles={["ADMIN", "MANAGER"]} />}>
                 <Route path="/shifts" element={<ShiftsPage />} />
-                <Route path="/reports" element={<PlaceholderPage title="Reports" phase="Phase 9" />} />
+                <Route path="/reports" element={<ReportsPage />} />
               </Route>
 
               <Route element={<ProtectedRoute roles={["ADMIN"]} />}>

@@ -139,20 +139,29 @@ async function main() {
   ];
 
   await Promise.all(
-    reservationDefs.map((r, i) =>
-      prisma.reservation.create({
+    reservationDefs.map((r, i) => {
+      const status = statusCycle[i % statusCycle.length];
+      // Seated/completed reservations get plausible seatedAt/completedAt timestamps so the
+      // Phase 9 average-turn-time report has real data to show, not just a null placeholder.
+      const seatedAt = status === "SEATED" || status === "COMPLETED" ? new Date(r.time.getTime() + 5 * 60_000) : null;
+      const turnMinutes = 40 + r.party * 3;
+      const completedAt = status === "COMPLETED" && seatedAt ? new Date(seatedAt.getTime() + turnMinutes * 60_000) : null;
+
+      return prisma.reservation.create({
         data: {
           guestId: r.guest.id,
           partySize: r.party,
           dateTime: r.time,
-          status: statusCycle[i % statusCycle.length],
+          status,
           tableId: r.table?.id ?? null,
           shiftId: r.shift.id,
           notes: r.notes,
           createdById: i % 2 === 0 ? host.id : admin.id,
+          seatedAt,
+          completedAt,
         },
-      })
-    )
+      });
+    })
   );
 
   // ---------- Waitlist (a couple of active walk-ins) ----------

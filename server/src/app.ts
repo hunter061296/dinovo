@@ -7,6 +7,7 @@ import guestRoutes from "./routes/guests";
 import shiftRoutes from "./routes/shifts";
 import reservationRoutes from "./routes/reservations";
 import waitlistRoutes from "./routes/waitlist";
+import reportRoutes from "./routes/reports";
 
 export function createApp() {
   const app = express();
@@ -22,6 +23,7 @@ export function createApp() {
   app.use("/api/shifts", shiftRoutes);
   app.use("/api/reservations", reservationRoutes);
   app.use("/api/waitlist", waitlistRoutes);
+  app.use("/api/reports", reportRoutes);
 
   return app;
 }
