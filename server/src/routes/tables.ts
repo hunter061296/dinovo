@@ -1,14 +1,15 @@
 import { Router } from "express";
 import { z } from "zod";
-import { TableShape } from "@prisma/client";
+import { TableShape, TableStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { authenticate, authorize } from "../middleware/auth";
+import { getIO } from "../lib/socket";
 
 const router = Router();
 
 router.use(authenticate);
 
-// Every role needs to see the floor plan (Hosts use it as the live status board in Phase 5).
+// Every role needs to see the floor plan (it doubles as the live status board — Phase 5).
 router.get("/", async (_req, res) => {
   const tables = await prisma.restaurantTable.findMany({ orderBy: { number: "asc" } });
   res.json(tables);
@@ -34,6 +35,7 @@ router.post("/", authorize("ADMIN", "MANAGER"), async (req, res) => {
   }
 
   const table = await prisma.restaurantTable.create({ data: parsed.data });
+  getIO().emit("table:created", table);
   res.status(201).json(table);
 });
 
@@ -60,15 +62,44 @@ router.patch("/:id", authorize("ADMIN", "MANAGER"), async (req, res) => {
 
   try {
     const table = await prisma.restaurantTable.update({ where: { id: req.params.id }, data: parsed.data });
+    getIO().emit("table:updated", table);
     res.json(table);
   } catch {
     res.status(404).json({ error: "Table not found" });
   }
 });
 
+// Open to every role (unlike layout edits above) — a Host needs one-click status changes
+// at the stand without Manager/Admin permissions.
+const updateStatusSchema = z.object({ status: z.nativeEnum(TableStatus) });
+
+router.patch("/:id/status", async (req, res) => {
+  const parsed = updateStatusSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+  try {
+    const table = await prisma.restaurantTable.update({ where: { id: req.params.id }, data: { status: parsed.data.status } });
+    getIO().emit("table:updated", table);
+    res.json(table);
+  } catch {
+    res.status(404).json({ error: "Table not found" });
+  }
+});
+
+// Stub — see NOTES.md. No real SMS/email provider is wired up for this MVP.
+router.post("/:id/notify", async (req, res) => {
+  const table = await prisma.restaurantTable.findUnique({ where: { id: req.params.id } });
+  if (!table) {
+    return res.status(404).json({ error: "Table not found" });
+  }
+  res.json({ success: true, message: `(stub) Guest for table ${table.number} would be notified here.` });
+});
+
 router.delete("/:id", authorize("ADMIN", "MANAGER"), async (req, res) => {
   try {
     await prisma.restaurantTable.delete({ where: { id: req.params.id } });
+    getIO().emit("table:deleted", { id: req.params.id });
     res.status(204).send();
   } catch {
     res.status(404).json({ error: "Table not found" });

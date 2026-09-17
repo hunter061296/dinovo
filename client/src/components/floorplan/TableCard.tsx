@@ -47,8 +47,7 @@ export function TableCard({ table, draggable, onClick }: Props) {
       className={`flex flex-col items-center justify-center border-2 text-sm font-medium shadow-sm transition-shadow hover:shadow-md ${
         table.shape === "ROUND" ? "rounded-full" : "rounded-lg"
       } ${STATUS_STYLES[table.status]} ${draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}`}
-      {...listeners}
-      {...attributes}
+      {...(draggable ? { ...listeners, ...attributes } : {})}
     >
       <span className="font-semibold">#{table.number}</span>
       <span className="text-xs opacity-75">{table.capacity} seats</span>

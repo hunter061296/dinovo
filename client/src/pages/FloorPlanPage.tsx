@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { restrictToParentElement } from "@dnd-kit/modifiers";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
+import { getSocket } from "../lib/socket";
 import type { RestaurantTable, TableShape } from "../lib/tables";
 import { TableCard } from "../components/floorplan/TableCard";
 import { TableFormModal } from "../components/floorplan/TableFormModal";
+import { TableStatusPopover } from "../components/floorplan/TableStatusPopover";
 
 const CANVAS_WIDTH = 900;
 const CANVAS_HEIGHT = 520;
@@ -21,11 +23,36 @@ export function FloorPlanPage() {
     queryFn: () => api.get("/tables").then((res) => res.data),
   });
 
-  const [modal, setModal] = useState<"add" | RestaurantTable | null>(null);
+  const [formModal, setFormModal] = useState<"add" | RestaurantTable | null>(null);
+  const [statusTable, setStatusTable] = useState<RestaurantTable | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // Keeps every open host-stand screen in sync — a status change made on one iPad shows up
+  // on all the others without anyone refreshing.
+  useEffect(() => {
+    const socket = getSocket();
+    const upsert = (table: RestaurantTable) => {
+      queryClient.setQueryData<RestaurantTable[]>(["tables"], (old) => {
+        if (!old) return old;
+        const exists = old.some((t) => t.id === table.id);
+        return exists ? old.map((t) => (t.id === table.id ? table : t)) : [...old, table].sort((a, b) => a.number - b.number);
+      });
+    };
+    const remove = ({ id }: { id: string }) => {
+      queryClient.setQueryData<RestaurantTable[]>(["tables"], (old) => old?.filter((t) => t.id !== id));
+    };
+    socket.on("table:created", upsert);
+    socket.on("table:updated", upsert);
+    socket.on("table:deleted", remove);
+    return () => {
+      socket.off("table:created", upsert);
+      socket.off("table:updated", upsert);
+      socket.off("table:deleted", remove);
+    };
+  }, [queryClient]);
+
   // Without an activation distance, dnd-kit's PointerSensor treats every pointerdown as a
-  // potential drag and swallows the click event, breaking "click a table to edit it".
+  // potential drag and swallows the click event, breaking "click a table for its actions".
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const moveTable = useMutation({
@@ -54,7 +81,7 @@ export function FloorPlanPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tables"] });
-      setModal(null);
+      setFormModal(null);
       setFormError(null);
     },
     onError: (err: any) => setFormError(err.response?.data?.error || "Failed to create table"),
@@ -65,7 +92,7 @@ export function FloorPlanPage() {
       api.patch(`/tables/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tables"] });
-      setModal(null);
+      setFormModal(null);
       setFormError(null);
     },
     onError: (err: any) => setFormError(err.response?.data?.error || "Failed to update table"),
@@ -75,7 +102,7 @@ export function FloorPlanPage() {
     mutationFn: (id: string) => api.delete(`/tables/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tables"] });
-      setModal(null);
+      setFormModal(null);
     },
   });
 
@@ -93,12 +120,13 @@ export function FloorPlanPage() {
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Floor Plan</h1>
           <p className="text-sm text-gray-500">
-            {canEdit ? "Drag tables to reposition. Click a table to edit or remove it." : "Read-only view of the current floor plan."}
+            Click a table to change its status.{" "}
+            {canEdit ? "Drag to reposition, or use Add table to edit the layout." : "Layout changes require a Manager or Admin."}
           </p>
         </div>
         {canEdit && (
           <button
-            onClick={() => setModal("add")}
+            onClick={() => setFormModal("add")}
             className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
           >
             Add table
@@ -128,36 +156,43 @@ export function FloorPlanPage() {
                 </div>
               )}
               {tables.map((table) => (
-                <TableCard
-                  key={table.id}
-                  table={table}
-                  draggable={canEdit}
-                  onClick={canEdit ? () => setModal(table) : undefined}
-                />
+                <TableCard key={table.id} table={table} draggable={canEdit} onClick={() => setStatusTable(table)} />
               ))}
             </div>
           </div>
         </DndContext>
       )}
 
-      {modal && (
+      {statusTable && (
+        <TableStatusPopover
+          table={tables?.find((t) => t.id === statusTable.id) ?? statusTable}
+          canEditLayout={canEdit}
+          onEditLayout={() => {
+            setFormModal(statusTable);
+            setStatusTable(null);
+          }}
+          onClose={() => setStatusTable(null)}
+        />
+      )}
+
+      {formModal && (
         <TableFormModal
-          initial={modal === "add" ? undefined : modal}
+          initial={formModal === "add" ? undefined : formModal}
           submitting={createTable.isPending || updateTable.isPending}
           error={formError}
           onClose={() => {
-            setModal(null);
+            setFormModal(null);
             setFormError(null);
           }}
           onSubmit={(data) => {
-            if (modal === "add") createTable.mutate(data);
-            else updateTable.mutate({ id: modal.id, data });
+            if (formModal === "add") createTable.mutate(data);
+            else updateTable.mutate({ id: formModal.id, data });
           }}
           onDelete={
-            modal !== "add"
+            formModal !== "add"
               ? () => {
-                  if (confirm(`Delete table ${modal.number}? This cannot be undone.`)) {
-                    deleteTable.mutate(modal.id);
+                  if (confirm(`Delete table ${formModal.number}? This cannot be undone.`)) {
+                    deleteTable.mutate(formModal.id);
                   }
                 }
               : undefined
