@@ -6,6 +6,7 @@ import { STATUS_LABELS, STATUS_STYLES, minutesToLabel } from "../lib/reservation
 import type { Reservation } from "../lib/reservations";
 import { coversInSlot, findPacingRule } from "../lib/pacing";
 import { ReservationFormModal, type ReservationFormValues } from "../components/reservations/ReservationFormModal";
+import { ReservationWizardModal } from "../components/reservations/ReservationWizardModal";
 
 const SLOT_MINUTES = 30;
 
@@ -160,30 +161,33 @@ export function ReservationsPage() {
         </div>
       )}
 
-      {modal && (
-        <ReservationFormModal
-          date={date}
-          shifts={shifts ?? []}
-          reservationsThatDay={reservations ?? []}
-          initial={modal === "add" ? undefined : modal}
-          submitting={createReservation.isPending || updateReservation.isPending}
+      {modal === "add" && (
+        <ReservationWizardModal
+          initialDate={date}
+          submitting={createReservation.isPending}
           error={formError}
           onClose={() => {
             setModal(null);
             setFormError(null);
           }}
-          onSubmit={(values) => {
-            if (modal === "add") {
-              createReservation.mutate(values);
-            } else {
-              updateReservation.mutate({ id: modal.id, values });
-            }
+          onSubmit={(values) => createReservation.mutate(values)}
+        />
+      )}
+
+      {modal && modal !== "add" && (
+        <ReservationFormModal
+          date={date}
+          shifts={shifts ?? []}
+          reservationsThatDay={reservations ?? []}
+          initial={modal}
+          submitting={updateReservation.isPending}
+          error={formError}
+          onClose={() => {
+            setModal(null);
+            setFormError(null);
           }}
-          onCancelReservation={
-            modal !== "add"
-              ? () => updateReservation.mutate({ id: modal.id, values: { status: "CANCELLED" } })
-              : undefined
-          }
+          onSubmit={(values) => updateReservation.mutate({ id: modal.id, values })}
+          onCancelReservation={() => updateReservation.mutate({ id: modal.id, values: { status: "CANCELLED" } })}
         />
       )}
     </div>
