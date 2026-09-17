@@ -7,6 +7,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { UsersPage } from "./pages/UsersPage";
 import { FloorPlanPage } from "./pages/FloorPlanPage";
 import { ReservationsPage } from "./pages/ReservationsPage";
+import { WaitlistPage } from "./pages/WaitlistPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 
 export default function App() {
@@ -21,7 +22,7 @@ export default function App() {
               <Route path="/" element={<DashboardPage />} />
               <Route path="/floor-plan" element={<FloorPlanPage />} />
               <Route path="/reservations" element={<ReservationsPage />} />
-              <Route path="/waitlist" element={<PlaceholderPage title="Waitlist" phase="Phase 6" />} />
+              <Route path="/waitlist" element={<WaitlistPage />} />
               <Route path="/guests" element={<PlaceholderPage title="Guestbook" phase="Phase 7" />} />
 
               <Route element={<ProtectedRoute roles={["ADMIN", "MANAGER"]} />}>
