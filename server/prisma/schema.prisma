@@ -140,7 +140,7 @@ model Reservation {
   dateTime    DateTime
   status      ReservationStatus @default(BOOKED)
   tableId     String?
-  table       RestaurantTable?  @relation(fields: [tableId], references: [id])
+  table       RestaurantTable?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
   shiftId     String?
   shift       Shift?            @relation(fields: [shiftId], references: [id])
   notes       String?           @db.Text
@@ -166,7 +166,7 @@ model WaitlistEntry {
   quotedWaitMinutes Int
   status            WaitlistStatus   @default(WAITING)
   seatedTableId     String?
-  seatedTable       RestaurantTable? @relation(fields: [seatedTableId], references: [id])
+  seatedTable       RestaurantTable? @relation(fields: [seatedTableId], references: [id], onDelete: SetNull)
   addedAt           DateTime         @default(now())
   seatedAt          DateTime?
   updatedAt         DateTime         @updatedAt
