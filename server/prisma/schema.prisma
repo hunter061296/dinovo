@@ -1,0 +1,176 @@
+// Dinovo — restaurant host-stand & reservation management
+// Prisma schema (Postgres)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Enums ----------
+
+enum Role {
+  ADMIN
+  MANAGER
+  HOST
+}
+
+enum TableShape {
+  ROUND
+  SQUARE
+  RECTANGLE
+}
+
+enum TableStatus {
+  OPEN
+  SEATED
+  ORDERED
+  NEEDS_CLEANING
+}
+
+enum ReservationStatus {
+  BOOKED
+  SEATED
+  COMPLETED
+  NO_SHOW
+  CANCELLED
+}
+
+enum WaitlistStatus {
+  WAITING
+  SEATED
+  CANCELLED
+}
+
+// ---------- Models ----------
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role     @default(HOST)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdReservations Reservation[] @relation("ReservationCreatedBy")
+
+  @@map("users")
+}
+
+// The floor plan. "RestaurantTable" avoids clashing with the SQL keyword TABLE.
+model RestaurantTable {
+  id        String      @id @default(uuid())
+  number    Int         @unique
+  capacity  Int
+  shape     TableShape  @default(SQUARE)
+  positionX Float       @default(0)
+  positionY Float       @default(0)
+  status    TableStatus @default(OPEN)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  reservations     Reservation[]
+  waitlistSeatings WaitlistEntry[]
+
+  @@map("restaurant_tables")
+}
+
+model Guest {
+  id         String   @id @default(uuid())
+  firstName  String
+  lastName   String
+  phone      String?
+  email      String?
+  visitCount Int      @default(0)
+  tags       String[] @default([])
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  reservations Reservation[]
+
+  // Guests are commonly looked up by phone/email at the host stand.
+  @@index([phone])
+  @@index([email])
+  @@map("guests")
+}
+
+model Shift {
+  id           String   @id @default(uuid())
+  name         String
+  dayOfWeek    Int // 0 = Sunday .. 6 = Saturday
+  // Stored as minutes-from-midnight so pacing/time-slot math is plain integer arithmetic.
+  startMinutes Int
+  endMinutes   Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  pacingRules  PacingRule[]
+  reservations Reservation[]
+
+  @@index([dayOfWeek])
+  @@map("shifts")
+}
+
+model PacingRule {
+  id              String   @id @default(uuid())
+  shiftId         String
+  shift           Shift    @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  // Start of the time slot this rule governs, minutes-from-midnight (e.g. 18:00 = 1080).
+  timeSlotMinutes Int
+  maxCovers       Int
+  maxPartySize    Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([shiftId, timeSlotMinutes])
+  @@map("pacing_rules")
+}
+
+model Reservation {
+  id          String            @id @default(uuid())
+  guestId     String
+  guest       Guest             @relation(fields: [guestId], references: [id])
+  partySize   Int
+  dateTime    DateTime
+  status      ReservationStatus @default(BOOKED)
+  tableId     String?
+  table       RestaurantTable?  @relation(fields: [tableId], references: [id])
+  shiftId     String?
+  shift       Shift?            @relation(fields: [shiftId], references: [id])
+  notes       String?           @db.Text
+  seatedAt    DateTime?
+  completedAt DateTime?
+  createdById String?
+  createdBy   User?             @relation("ReservationCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  // The day-view timeline and pacing checks both filter/sort by time.
+  @@index([dateTime])
+  @@index([tableId])
+  @@index([guestId])
+  @@map("reservations")
+}
+
+model WaitlistEntry {
+  id                String           @id @default(uuid())
+  guestName         String
+  phone             String?
+  partySize         Int
+  quotedWaitMinutes Int
+  status            WaitlistStatus   @default(WAITING)
+  seatedTableId     String?
+  seatedTable       RestaurantTable? @relation(fields: [seatedTableId], references: [id])
+  addedAt           DateTime         @default(now())
+  seatedAt          DateTime?
+  updatedAt         DateTime         @updatedAt
+
+  @@index([status])
+  @@map("waitlist_entries")
+}
