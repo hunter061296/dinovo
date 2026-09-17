@@ -4,7 +4,11 @@ import { api } from "../../lib/api";
 import { formatElapsed } from "../../lib/elapsed";
 import type { SeatedSummaryEntry } from "../../lib/tables";
 
-export function CurrentlySeatedPanel() {
+interface Props {
+  fullWidth?: boolean;
+}
+
+export function CurrentlySeatedPanel({ fullWidth }: Props = {}) {
   // Re-render every 30s so the elapsed timers stay roughly live without polling the server.
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -19,7 +23,7 @@ export function CurrentlySeatedPanel() {
   });
 
   return (
-    <div className="w-full shrink-0 rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 sm:w-56">
+    <div className={`w-full shrink-0 rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 ${fullWidth ? "" : "sm:w-56"}`}>
       <h2 className="border-b border-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:text-gray-300">
         Currently Seated {entries && entries.length > 0 && <span className="text-gray-400 dark:text-gray-500">({entries.length})</span>}
       </h2>

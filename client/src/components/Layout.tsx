@@ -45,16 +45,16 @@ export function Layout() {
               ))}
           </nav>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-1 flex-wrap items-center justify-end gap-3">
           <QuickSearch />
           <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
-            <span>
+            <span className="whitespace-nowrap">
               {user.name} <span className="text-gray-400 dark:text-gray-500">({user.role})</span>
             </span>
             <ThemeToggle />
             <button
               onClick={logout}
-              className="rounded-md border border-gray-300 px-3 py-1.5 font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+              className="whitespace-nowrap rounded-md border border-gray-300 px-3 py-1.5 font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
             >
               Log out
             </button>
