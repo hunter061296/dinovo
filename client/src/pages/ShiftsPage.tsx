@@ -50,31 +50,31 @@ export function ShiftsPage() {
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Shifts & Pacing</h1>
-          <p className="text-sm text-gray-500">Define shifts and per-slot cover/party-size caps.</p>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Shifts & Pacing</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Define shifts and per-slot cover/party-size caps.</p>
         </div>
         <button
           onClick={() => setFormModal("add")}
-          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          className="rounded-md bg-accent-600 px-4 py-2 text-sm font-medium text-white hover:bg-accent-700"
         >
           Add shift
         </button>
       </div>
 
-      {isLoading && <div className="text-sm text-gray-500">Loading shifts...</div>}
-      {isError && <div className="text-sm text-red-600">Failed to load shifts.</div>}
+      {isLoading && <div className="text-sm text-gray-500 dark:text-gray-400">Loading shifts...</div>}
+      {isError && <div className="text-sm text-red-600 dark:text-red-400">Failed to load shifts.</div>}
 
       {shifts && (
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
           {shifts.length === 0 ? (
-            <div className="p-6 text-center text-sm text-gray-400">No shifts configured yet.</div>
+            <div className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">No shifts configured yet.</div>
           ) : (
             shifts.map((shift) => (
-              <div key={shift.id} className="border-t border-gray-100 first:border-t-0">
+              <div key={shift.id} className="border-t border-gray-100 dark:border-gray-700 first:border-t-0">
                 <div className="flex items-center justify-between px-4 py-3">
                   <div>
-                    <div className="font-medium text-gray-900">{shift.name}</div>
-                    <div className="text-xs text-gray-500">
+                    <div className="font-medium text-gray-900 dark:text-gray-100">{shift.name}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
                       {DAY_NAMES[shift.dayOfWeek]} · {minutesToLabel(shift.startMinutes)} – {minutesToLabel(shift.endMinutes)} ·{" "}
                       {shift.pacingRules.length} slot{shift.pacingRules.length === 1 ? "" : "s"} capped
                     </div>
@@ -82,11 +82,11 @@ export function ShiftsPage() {
                   <div className="flex gap-3">
                     <button
                       onClick={() => setExpanded(expanded === shift.id ? null : shift.id)}
-                      className="text-xs font-medium text-indigo-600 hover:underline"
+                      className="text-xs font-medium text-accent-600 hover:underline"
                     >
                       {expanded === shift.id ? "Hide pacing" : "Edit pacing"}
                     </button>
-                    <button onClick={() => setFormModal(shift)} className="text-xs font-medium text-gray-600 hover:underline">
+                    <button onClick={() => setFormModal(shift)} className="text-xs font-medium text-gray-600 hover:underline dark:text-gray-400">
                       Edit shift
                     </button>
                   </div>

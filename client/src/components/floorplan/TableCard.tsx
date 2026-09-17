@@ -3,10 +3,10 @@ import { CSS } from "@dnd-kit/utilities";
 import type { RestaurantTable } from "../../lib/tables";
 
 const STATUS_STYLES: Record<RestaurantTable["status"], string> = {
-  OPEN: "bg-white border-gray-300 text-gray-700",
-  SEATED: "bg-blue-100 border-blue-400 text-blue-800",
-  ORDERED: "bg-amber-100 border-amber-400 text-amber-800",
-  NEEDS_CLEANING: "bg-red-100 border-red-400 text-red-800",
+  OPEN: "bg-white border-gray-300 text-gray-700 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200",
+  SEATED: "bg-blue-100 border-blue-400 text-blue-800 dark:bg-blue-900/40 dark:border-blue-600 dark:text-blue-300",
+  ORDERED: "bg-amber-100 border-amber-400 text-amber-800 dark:bg-amber-900/40 dark:border-amber-600 dark:text-amber-300",
+  NEEDS_CLEANING: "bg-red-100 border-red-400 text-red-800 dark:bg-red-900/40 dark:border-red-600 dark:text-red-300",
 };
 
 function sizeFor(capacity: number, shape: RestaurantTable["shape"]) {

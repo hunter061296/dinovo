@@ -1,5 +1,85 @@
 @import "tailwindcss";
 
+/* Class-based dark mode (instead of Tailwind's default media-query-only dark:) so a manual
+   Light/Dark/System toggle can control it via a `dark` class on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Accent color presets. Each preset sets the --accent-* custom properties; the @theme block
+   below maps them to real `accent-*` Tailwind utilities (bg-accent-600, text-accent-700, ...)
+   so switching presets re-colors every button/link/badge that uses those utilities at once. */
+:root,
+[data-accent="indigo"] {
+  --accent-50: #eef2ff;
+  --accent-100: #e0e7ff;
+  --accent-200: #c7d2fe;
+  --accent-300: #a5b4fc;
+  --accent-400: #818cf8;
+  --accent-500: #6366f1;
+  --accent-600: #4f46e5;
+  --accent-700: #4338ca;
+  --accent-800: #3730a3;
+}
+
+[data-accent="blue"] {
+  --accent-50: #eff6ff;
+  --accent-100: #dbeafe;
+  --accent-200: #bfdbfe;
+  --accent-300: #93c5fd;
+  --accent-400: #60a5fa;
+  --accent-500: #3b82f6;
+  --accent-600: #2563eb;
+  --accent-700: #1d4ed8;
+  --accent-800: #1e40af;
+}
+
+[data-accent="emerald"] {
+  --accent-50: #ecfdf5;
+  --accent-100: #d1fae5;
+  --accent-200: #a7f3d0;
+  --accent-300: #6ee7b7;
+  --accent-400: #34d399;
+  --accent-500: #10b981;
+  --accent-600: #059669;
+  --accent-700: #047857;
+  --accent-800: #065f46;
+}
+
+[data-accent="rose"] {
+  --accent-50: #fff1f2;
+  --accent-100: #ffe4e6;
+  --accent-200: #fecdd3;
+  --accent-300: #fda4af;
+  --accent-400: #fb7185;
+  --accent-500: #f43f5e;
+  --accent-600: #e11d48;
+  --accent-700: #be123c;
+  --accent-800: #9f1239;
+}
+
+[data-accent="amber"] {
+  --accent-50: #fffbeb;
+  --accent-100: #fef3c7;
+  --accent-200: #fde68a;
+  --accent-300: #fcd34d;
+  --accent-400: #fbbf24;
+  --accent-500: #f59e0b;
+  --accent-600: #d97706;
+  --accent-700: #b45309;
+  --accent-800: #92400e;
+}
+
+@theme {
+  --color-accent-50: var(--accent-50);
+  --color-accent-100: var(--accent-100);
+  --color-accent-200: var(--accent-200);
+  --color-accent-300: var(--accent-300);
+  --color-accent-400: var(--accent-400);
+  --color-accent-500: var(--accent-500);
+  --color-accent-600: var(--accent-600);
+  --color-accent-700: var(--accent-700);
+  --color-accent-800: var(--accent-800);
+}
+
 html,
 body,
 #root {
@@ -9,4 +89,13 @@ body,
 body {
   margin: 0;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Dark mode swaps only the page/card chrome; accent colors stay the same custom properties.
+   Setting a base text color here is a safety net for any element that doesn't get an explicit
+   dark:text-* utility below — better a slightly-off default than invisible black-on-near-black text. */
+.dark body {
+  background-color: #111827;
+  color: #e5e7eb;
+  color-scheme: dark;
 }

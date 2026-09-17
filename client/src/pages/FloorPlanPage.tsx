@@ -135,8 +135,8 @@ export function FloorPlanPage() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Floor Plan</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Floor Plan</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             Click a table to change its status.{" "}
             {canEdit ? "Drag to reposition, or use Add table to edit the layout." : "Layout changes require a Manager or Admin."}
           </p>
@@ -144,15 +144,15 @@ export function FloorPlanPage() {
         {canEdit && (
           <button
             onClick={() => setFormModal("add")}
-            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            className="rounded-md bg-accent-600 px-4 py-2 text-sm font-medium text-white hover:bg-accent-700"
           >
             Add table
           </button>
         )}
       </div>
 
-      {isLoading && <div className="text-sm text-gray-500">Loading floor plan...</div>}
-      {isError && <div className="text-sm text-red-600">Failed to load the floor plan.</div>}
+      {isLoading && <div className="text-sm text-gray-500 dark:text-gray-400">Loading floor plan...</div>}
+      {isError && <div className="text-sm text-red-600 dark:text-red-400">Failed to load the floor plan.</div>}
 
       {/* No restrictToParentElement modifier here — it measures the parent's scaled screen rect,
           which doesn't line up with the child's own (unscaled) transform space once the canvas
@@ -164,7 +164,7 @@ export function FloorPlanPage() {
             return (
               <div
                 ref={containerRef}
-                className="relative overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
+                className="relative overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
                 style={{ width: "100%", maxWidth: CANVAS_WIDTH + 40, height: canvasHeight * scale + 40, padding: 20 }}
               >
                 <div
@@ -172,7 +172,7 @@ export function FloorPlanPage() {
                   style={{ width: CANVAS_WIDTH, height: canvasHeight, transform: `scale(${scale})` }}
                 >
                   {tables.length === 0 && (
-                    <div className="flex h-full items-center justify-center text-sm text-gray-400">
+                    <div className="flex h-full items-center justify-center text-sm text-gray-400 dark:text-gray-500">
                       No tables yet. {canEdit && 'Click "Add table" to build your floor plan.'}
                     </div>
                   )}

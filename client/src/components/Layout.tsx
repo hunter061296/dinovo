@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../lib/AuthContext";
 import type { Role } from "../lib/types";
+import { ThemeToggle } from "./ThemeToggle";
 
 const navItems: { to: string; label: string; roles: Role[] }[] = [
   { to: "/", label: "Dashboard", roles: ["ADMIN", "MANAGER", "HOST"] },
@@ -18,10 +19,10 @@ export function Layout() {
   if (!user) return null;
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
-      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-white px-4 py-3 sm:px-6">
+    <div className="flex min-h-screen flex-col bg-gray-50 dark:bg-gray-900">
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800 sm:px-6">
         <div className="flex items-center gap-6">
-          <span className="text-lg font-semibold text-gray-900">Dinovo</span>
+          <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">Dinovo</span>
           <nav className="flex flex-wrap gap-1">
             {navItems
               .filter((item) => item.roles.includes(user.role))
@@ -32,7 +33,9 @@ export function Layout() {
                   end={item.to === "/"}
                   className={({ isActive }) =>
                     `rounded-md px-3 py-2 text-sm font-medium ${
-                      isActive ? "bg-indigo-100 text-indigo-700" : "text-gray-600 hover:bg-gray-100"
+                      isActive
+                        ? "bg-accent-100 text-accent-700 dark:bg-accent-800/40 dark:text-accent-300"
+                        : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
                     }`
                   }
                 >
@@ -41,13 +44,14 @@ export function Layout() {
               ))}
           </nav>
         </div>
-        <div className="flex items-center gap-3 text-sm text-gray-600">
+        <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
           <span>
-            {user.name} <span className="text-gray-400">({user.role})</span>
+            {user.name} <span className="text-gray-400 dark:text-gray-500">({user.role})</span>
           </span>
+          <ThemeToggle />
           <button
             onClick={logout}
-            className="rounded-md border border-gray-300 px-3 py-1.5 font-medium text-gray-700 hover:bg-gray-100"
+            className="rounded-md border border-gray-300 px-3 py-1.5 font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             Log out
           </button>

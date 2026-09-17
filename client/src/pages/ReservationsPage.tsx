@@ -89,51 +89,54 @@ export function ReservationsPage() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Reservation Book</h1>
-          <p className="text-sm text-gray-500">Day view across all shifts.</p>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Reservation Book</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Day view across all shifts.</p>
         </div>
         <div className="flex items-center gap-3">
           <input
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
           />
           <button
             onClick={() => setModal("add")}
-            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            className="rounded-md bg-accent-600 px-4 py-2 text-sm font-medium text-white hover:bg-accent-700"
           >
             New reservation
           </button>
         </div>
       </div>
 
-      {isLoading && <div className="text-sm text-gray-500">Loading reservations...</div>}
-      {isError && <div className="text-sm text-red-600">Failed to load reservations.</div>}
+      {isLoading && <div className="text-sm text-gray-500 dark:text-gray-400">Loading reservations...</div>}
+      {isError && <div className="text-sm text-red-600 dark:text-red-400">Failed to load reservations.</div>}
       {!isLoading && !isError && shifts && shifts.length === 0 && (
-        <div className="text-sm text-gray-500">No shifts are configured yet, so there's no timeline to show.</div>
+        <div className="text-sm text-gray-500 dark:text-gray-400">No shifts are configured yet, so there's no timeline to show.</div>
       )}
 
       {!isLoading && !isError && slots.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
           {slots.map((slot) => {
             const items = reservationsBySlot.get(slot) ?? [];
             const rule = shifts ? findPacingRule(shifts, slot) : undefined;
             const covers = reservations ? coversInSlot(reservations, slot) : 0;
             const overCap = rule && covers > rule.maxCovers;
             return (
-              <div key={slot} className={`flex border-t border-gray-100 first:border-t-0 ${overCap ? "bg-amber-50" : ""}`}>
-                <div className="w-24 shrink-0 border-r border-gray-100 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-500">
+              <div
+                key={slot}
+                className={`flex border-t border-gray-100 dark:border-gray-700 first:border-t-0 ${overCap ? "bg-amber-50 dark:bg-amber-900/20" : ""}`}
+              >
+                <div className="w-24 shrink-0 border-r border-gray-100 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
                   {minutesToLabel(slot)}
                   {rule && (
-                    <div className={overCap ? "font-semibold text-amber-700" : "text-gray-400"}>
+                    <div className={overCap ? "font-semibold text-amber-700 dark:text-amber-400" : "text-gray-400 dark:text-gray-500"}>
                       {covers}/{rule.maxCovers} covers{overCap ? " ⚠" : ""}
                     </div>
                   )}
                 </div>
                 <div className="flex flex-1 flex-wrap gap-2 p-2">
                   {items.length === 0 ? (
-                    <span className="py-1.5 text-xs text-gray-300">—</span>
+                    <span className="py-1.5 text-xs text-gray-300 dark:text-gray-600">—</span>
                   ) : (
                     items.map((r) => (
                       <button

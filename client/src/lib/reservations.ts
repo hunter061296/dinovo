@@ -58,11 +58,11 @@ export const STATUS_LABELS: Record<ReservationStatus, string> = {
 };
 
 export const STATUS_STYLES: Record<ReservationStatus, string> = {
-  BOOKED: "bg-gray-100 text-gray-700 border-gray-300",
-  SEATED: "bg-blue-100 text-blue-800 border-blue-300",
-  COMPLETED: "bg-green-100 text-green-800 border-green-300",
-  NO_SHOW: "bg-red-100 text-red-800 border-red-300",
-  CANCELLED: "bg-gray-100 text-gray-400 border-gray-200 line-through",
+  BOOKED: "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-700/50 dark:text-gray-300 dark:border-gray-600",
+  SEATED: "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-600",
+  COMPLETED: "bg-green-100 text-green-800 border-green-300 dark:bg-green-900/40 dark:text-green-300 dark:border-green-600",
+  NO_SHOW: "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/40 dark:text-red-300 dark:border-red-600",
+  CANCELLED: "bg-gray-100 text-gray-400 border-gray-200 line-through dark:bg-gray-800 dark:text-gray-500 dark:border-gray-700",
 };
 
 export function minutesToLabel(minutes: number): string {

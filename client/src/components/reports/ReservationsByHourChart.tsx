@@ -8,7 +8,7 @@ const TRACK_HEIGHT_PX = 160;
 
 export function ReservationsByHourChart({ data }: Props) {
   if (data.length === 0) {
-    return <div className="flex h-48 items-center justify-center text-sm text-gray-400">No reservations in this range.</div>;
+    return <div className="flex h-48 items-center justify-center text-sm text-gray-400 dark:text-gray-500">No reservations in this range.</div>;
   }
 
   const maxCount = Math.max(...data.map((d) => d.count));
@@ -23,11 +23,11 @@ export function ReservationsByHourChart({ data }: Props) {
           {/* A fixed-height track so the bar's percentage height has a definite ancestor to resolve against. */}
           <div className="flex w-full items-end" style={{ height: TRACK_HEIGHT_PX }}>
             <div
-              className="w-full rounded-t bg-indigo-500 transition-colors group-hover:bg-indigo-600"
+              className="w-full rounded-t bg-accent-500 transition-colors group-hover:bg-accent-600"
               style={{ height: `${Math.max((d.count / maxCount) * 100, 4)}%` }}
             />
           </div>
-          <span className="text-[10px] text-gray-500">{formatHour(d.hour)}</span>
+          <span className="text-[10px] text-gray-500 dark:text-gray-400">{formatHour(d.hour)}</span>
         </div>
       ))}
     </div>
