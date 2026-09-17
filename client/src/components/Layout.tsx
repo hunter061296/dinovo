@@ -2,6 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../lib/AuthContext";
 import type { Role } from "../lib/types";
 import { ThemeToggle } from "./ThemeToggle";
+import { QuickSearch } from "./QuickSearch";
 
 const navItems: { to: string; label: string; roles: Role[] }[] = [
   { to: "/", label: "Dashboard", roles: ["ADMIN", "MANAGER", "HOST"] },
@@ -44,17 +45,20 @@ export function Layout() {
               ))}
           </nav>
         </div>
-        <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
-          <span>
-            {user.name} <span className="text-gray-400 dark:text-gray-500">({user.role})</span>
-          </span>
-          <ThemeToggle />
-          <button
-            onClick={logout}
-            className="rounded-md border border-gray-300 px-3 py-1.5 font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-          >
-            Log out
-          </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <QuickSearch />
+          <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
+            <span>
+              {user.name} <span className="text-gray-400 dark:text-gray-500">({user.role})</span>
+            </span>
+            <ThemeToggle />
+            <button
+              onClick={logout}
+              className="rounded-md border border-gray-300 px-3 py-1.5 font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              Log out
+            </button>
+          </div>
         </div>
       </header>
       <main className="flex-1 p-4 sm:p-6">
