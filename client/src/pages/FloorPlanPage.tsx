@@ -4,12 +4,19 @@ import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } f
 import { api } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
 import { getSocket } from "../lib/socket";
-import type { RestaurantTable, Section, TableShape } from "../lib/tables";
+import type { RestaurantTable, Section, SeatedSummaryEntry, TableShape } from "../lib/tables";
+import type { Reservation } from "../lib/reservations";
+import { minutesToLabel } from "../lib/reservations";
 import { TableCard } from "../components/floorplan/TableCard";
 import { TableFormModal } from "../components/floorplan/TableFormModal";
 import { TableStatusPopover } from "../components/floorplan/TableStatusPopover";
 import { SectionManagerModal } from "../components/floorplan/SectionManagerModal";
-import { CurrentlySeatedPanel } from "../components/floorplan/CurrentlySeatedPanel";
+import { FloorPlanSidePanel } from "../components/floorplan/FloorPlanSidePanel";
+
+function todayLocalISODate() {
+  const d = new Date();
+  return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
+}
 
 const CANVAS_WIDTH = 900;
 const CANVAS_HEIGHT = 520;
@@ -31,6 +38,19 @@ export function FloorPlanPage() {
     queryFn: () => api.get("/sections").then((res) => res.data),
   });
 
+  // Feeds the guest-name/upcoming-reservation badges drawn directly on each TableCard — shares a
+  // cache key with FloorPlanSidePanel's own queries, so this doesn't add an extra network round trip.
+  const today = todayLocalISODate();
+  const { data: todaysReservations } = useQuery<Reservation[]>({
+    queryKey: ["reservations", today],
+    queryFn: () => api.get("/reservations", { params: { date: today } }).then((res) => res.data),
+  });
+  const { data: seatedSummary } = useQuery<SeatedSummaryEntry[]>({
+    queryKey: ["tables", "seated-summary"],
+    queryFn: () => api.get("/tables/seated-summary").then((res) => res.data),
+    refetchInterval: 30_000,
+  });
+
   const [formModal, setFormModal] = useState<"add" | RestaurantTable | null>(null);
   const [statusTable, setStatusTable] = useState<RestaurantTable | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -40,6 +60,25 @@ export function FloorPlanPage() {
 
   const displayedTables = tables?.filter((t) => !selectedSectionId || t.sectionId === selectedSectionId) ?? [];
   const selectedSectionName = selectedSectionId ? sections?.find((s) => s.id === selectedSectionId)?.name : "All tables";
+
+  const seatedGuestByTable = new Map(
+    (seatedSummary ?? []).map((e) => [e.tableId, e.guestName ?? "Walk-in"] as const)
+  );
+
+  // Soonest not-yet-seated reservation per table, so an OPEN table can show "who's coming next".
+  const upcomingByTable = new Map<string, { time: string; guestName: string; at: number }>();
+  for (const r of todaysReservations ?? []) {
+    if (r.status !== "BOOKED" || !r.tableId) continue;
+    const at = new Date(r.dateTime).getTime();
+    const existing = upcomingByTable.get(r.tableId);
+    if (existing && existing.at <= at) continue;
+    const dt = new Date(r.dateTime);
+    upcomingByTable.set(r.tableId, {
+      at,
+      time: minutesToLabel(dt.getHours() * 60 + dt.getMinutes()),
+      guestName: `${r.guest.firstName} ${r.guest.lastName}`,
+    });
+  }
 
   // On a tablet-width screen the 900px canvas is wider than the viewport — rather than force
   // horizontal scrolling to see the rest of the floor plan, scale the whole canvas down to fit.
@@ -192,7 +231,7 @@ export function FloorPlanPage() {
 
       {tables && (
         <div className="flex flex-col gap-4 sm:flex-row">
-          <CurrentlySeatedPanel />
+          <FloorPlanSidePanel />
 
           {/* No restrictToParentElement modifier here — it measures the parent's scaled screen
               rect, which doesn't line up with the child's own (unscaled) transform space once the
@@ -226,7 +265,15 @@ export function FloorPlanPage() {
                         </div>
                       )}
                       {displayedTables.map((table) => (
-                        <TableCard key={table.id} table={table} draggable={canEdit} scale={scale} onClick={() => setStatusTable(table)} />
+                        <TableCard
+                          key={table.id}
+                          table={table}
+                          draggable={canEdit}
+                          scale={scale}
+                          onClick={() => setStatusTable(table)}
+                          seatedGuestName={seatedGuestByTable.get(table.id) ?? null}
+                          upcomingReservation={upcomingByTable.get(table.id) ?? null}
+                        />
                       ))}
                     </div>
                   </div>

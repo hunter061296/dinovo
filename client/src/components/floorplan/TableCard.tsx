@@ -23,9 +23,14 @@ interface Props {
   // translate is in real screen pixels, which the ancestor's scale() would otherwise compress —
   // so we inflate it here to cancel that out and keep the drag tracking the cursor 1:1.
   scale?: number;
+  // Who's currently in the seat, when table.status === "SEATED".
+  seatedGuestName?: string | null;
+  // The soonest upcoming reservation for this table today, when table.status === "OPEN" — lets a
+  // host see at a glance which open tables already have a party coming in.
+  upcomingReservation?: { time: string; guestName: string } | null;
 }
 
-export function TableCard({ table, draggable, onClick, scale = 1 }: Props) {
+export function TableCard({ table, draggable, onClick, scale = 1, seatedGuestName, upcomingReservation }: Props) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: table.id,
     disabled: !draggable,
@@ -44,19 +49,29 @@ export function TableCard({ table, draggable, onClick, scale = 1 }: Props) {
     zIndex: isDragging ? 10 : 1,
   };
 
+  const showsReservationBadge = table.status === "OPEN" && !!upcomingReservation;
+
   return (
     <button
       type="button"
       ref={setNodeRef}
       style={style}
       onClick={onClick}
-      className={`flex flex-col items-center justify-center border-2 text-sm font-medium shadow-sm transition-shadow hover:shadow-md ${
+      className={`flex flex-col items-center justify-center border-2 px-1 text-sm font-medium shadow-sm transition-shadow hover:shadow-md ${
         table.shape === "ROUND" ? "rounded-full" : "rounded-lg"
-      } ${STATUS_STYLES[table.status]} ${draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}`}
+      } ${STATUS_STYLES[table.status]} ${draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${
+        showsReservationBadge ? "ring-2 ring-amber-400 dark:ring-amber-500" : ""
+      }`}
       {...(draggable ? { ...listeners, ...attributes } : {})}
     >
       <span className="font-semibold">#{table.number}</span>
-      <span className="text-xs opacity-75">{table.capacity} seats</span>
+      {table.status === "SEATED" && seatedGuestName ? (
+        <span className="max-w-full truncate text-xs opacity-75">{seatedGuestName}</span>
+      ) : showsReservationBadge ? (
+        <span className="max-w-full truncate text-xs opacity-75">{upcomingReservation!.time}</span>
+      ) : (
+        <span className="text-xs opacity-75">{table.capacity} seats</span>
+      )}
     </button>
   );
 }

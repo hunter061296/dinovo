@@ -4,6 +4,7 @@ import { ReservationStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { findShiftForDateTime } from "../lib/shiftMatch";
+import { getIO } from "../lib/socket";
 
 const router = Router();
 
@@ -127,6 +128,26 @@ router.patch("/:id", async (req, res) => {
         data: { visitCount: { increment: 1 } },
       });
     }
+
+    // Keep the floor plan in sync with the reservation book: seating a reservation occupies its
+    // table, and completing it buses the table for cleaning — mirrors the waitlist's seat-now flow.
+    if (parsed.data.status === "SEATED" && reservation.tableId) {
+      const updatedTable = await prisma.restaurantTable.update({
+        where: { id: reservation.tableId },
+        data: { status: "SEATED", statusUpdatedAt: new Date() },
+      });
+      getIO().emit("table:updated", updatedTable);
+    } else if (parsed.data.status === "COMPLETED" && reservation.tableId) {
+      const table = await prisma.restaurantTable.findUnique({ where: { id: reservation.tableId } });
+      if (table && table.status === "SEATED") {
+        const updatedTable = await prisma.restaurantTable.update({
+          where: { id: reservation.tableId },
+          data: { status: "NEEDS_CLEANING", statusUpdatedAt: new Date() },
+        });
+        getIO().emit("table:updated", updatedTable);
+      }
+    }
+
     res.json(reservation);
   } catch {
     res.status(404).json({ error: "Reservation not found" });

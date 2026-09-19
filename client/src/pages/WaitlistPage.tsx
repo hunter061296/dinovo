@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { getSocket } from "../lib/socket";
 import { minutesSince, type WaitlistEntry } from "../lib/waitlist";
-import { SeatNowModal } from "../components/waitlist/SeatNowModal";
+import { SeatTableModal } from "../components/SeatTableModal";
 
 export function WaitlistPage() {
   const queryClient = useQueryClient();
@@ -156,8 +156,10 @@ export function WaitlistPage() {
       )}
 
       {seating && (
-        <SeatNowModal
-          entry={seating}
+        <SeatTableModal
+          title={seating.guestName}
+          subtitle={`Party of ${seating.partySize} · choose an open table.`}
+          partySize={seating.partySize}
           submitting={seatEntry.isPending}
           onClose={() => setSeating(null)}
           onSeat={(tableId) => seatEntry.mutate({ id: seating.id, tableId })}
