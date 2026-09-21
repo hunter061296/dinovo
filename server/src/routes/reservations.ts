@@ -4,6 +4,7 @@ import { ReservationStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { findShiftForDateTime } from "../lib/shiftMatch";
+import { checkPacingCap } from "../lib/pacing";
 import { getIO } from "../lib/socket";
 
 const router = Router();
@@ -78,7 +79,12 @@ router.post("/", async (req, res) => {
     },
     include,
   });
-  res.status(201).json(reservation);
+
+  const cap = await checkPacingCap({ dateTime, partySize, shiftId: shift?.id });
+  if (cap.overCap) {
+    console.warn(`[pacing] reservation ${reservation.id} exceeds cap: ${cap.capDetail}`);
+  }
+  res.status(201).json({ ...reservation, overCap: cap.overCap, capDetail: cap.capDetail });
 });
 
 const updateReservationSchema = z.object({
@@ -112,6 +118,19 @@ router.patch("/:id", async (req, res) => {
   }
   if (parsed.data.status === "COMPLETED" || parsed.data.status === "NO_SHOW" || parsed.data.status === "CANCELLED") {
     data.completedAt = new Date();
+  }
+
+  let cap: { overCap: boolean; capDetail: string | null } = { overCap: false, capDetail: null };
+  if (parsed.data.partySize !== undefined || parsed.data.dateTime !== undefined || parsed.data.status !== undefined) {
+    cap = await checkPacingCap({
+      dateTime: parsed.data.dateTime ?? existing.dateTime,
+      partySize: parsed.data.partySize ?? existing.partySize,
+      shiftId: parsed.data.dateTime ? (data.shiftId as string | null) : existing.shiftId,
+      excludeId: existing.id,
+    });
+    if (cap.overCap) {
+      console.warn(`[pacing] reservation ${existing.id} update exceeds cap: ${cap.capDetail}`);
+    }
   }
 
   try {
@@ -148,7 +167,7 @@ router.patch("/:id", async (req, res) => {
       }
     }
 
-    res.json(reservation);
+    res.json({ ...reservation, overCap: cap.overCap, capDetail: cap.capDetail });
   } catch {
     res.status(404).json({ error: "Reservation not found" });
   }
