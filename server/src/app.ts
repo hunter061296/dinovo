@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import authRoutes from "./routes/auth";
 import userRoutes from "./routes/users";
 import tableRoutes from "./routes/tables";
@@ -13,6 +14,15 @@ import sectionRoutes from "./routes/sections";
 export function createApp() {
   const app = express();
 
+  // This service only ever returns JSON, never HTML — the page-oriented directives (CSP,
+  // COEP/CORP) assume a browser is rendering markup served from here, so they're disabled.
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+      crossOriginResourcePolicy: false,
+    }),
+  );
   app.use(cors({ origin: process.env.CLIENT_ORIGIN || "http://localhost:5173" }));
   app.use(express.json());
 
