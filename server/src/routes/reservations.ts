@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { findShiftForDateTime } from "../lib/shiftMatch";
 import { checkPacingCap } from "../lib/pacing";
+import { findConflictingReservation, conflictMessage } from "../lib/tableAvailability";
 import { getIO } from "../lib/socket";
 
 const router = Router();
@@ -56,6 +57,13 @@ router.post("/", async (req, res) => {
   }
   const { partySize, dateTime, tableId, notes } = parsed.data;
 
+  if (tableId) {
+    const conflict = await findConflictingReservation({ tableId, dateTime });
+    if (conflict) {
+      return res.status(409).json({ error: conflictMessage(conflict) });
+    }
+  }
+
   let guestId = parsed.data.guestId;
   if (!guestId && parsed.data.newGuest) {
     const g = parsed.data.newGuest;
@@ -104,6 +112,22 @@ router.patch("/:id", async (req, res) => {
   const existing = await prisma.reservation.findUnique({ where: { id: req.params.id } });
   if (!existing) {
     return res.status(404).json({ error: "Reservation not found" });
+  }
+
+  // A table can't literally seat two parties at once, so this blocks the save (unlike the
+  // pacing cap above, which only warns). Runs whenever the table being assigned is changing, or
+  // an already-assigned table's time is moving, since either can newly collide with another
+  // reservation on that table.
+  const effectiveTableId = parsed.data.tableId !== undefined ? parsed.data.tableId : existing.tableId;
+  if (effectiveTableId && (parsed.data.tableId !== undefined || parsed.data.dateTime !== undefined)) {
+    const conflict = await findConflictingReservation({
+      tableId: effectiveTableId,
+      dateTime: parsed.data.dateTime ?? existing.dateTime,
+      excludeId: existing.id,
+    });
+    if (conflict) {
+      return res.status(409).json({ error: conflictMessage(conflict) });
+    }
   }
 
   const data: Record<string, unknown> = { ...parsed.data };
