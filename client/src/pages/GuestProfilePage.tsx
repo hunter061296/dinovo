@@ -87,6 +87,18 @@ export function GuestProfilePage() {
             {lastVisit ? new Date(lastVisit.dateTime).toLocaleDateString() : "—"}
           </div>
         </div>
+        <div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">No-shows</div>
+          {/* 2+ mirrors FREQUENT_NO_SHOW_THRESHOLD in server/src/lib/guestTags.ts — the guest is
+              also auto-tagged "Frequent no-show" at that point (see Tags below). */}
+          <div
+            className={`text-lg font-semibold ${
+              guest.noShowCount >= 2 ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-gray-100"
+            }`}
+          >
+            {guest.noShowCount}
+          </div>
+        </div>
       </div>
 
       <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 p-4">

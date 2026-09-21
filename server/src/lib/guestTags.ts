@@ -7,9 +7,13 @@ export const LAPSING_DAYS_THRESHOLD = 60;
 // Lapsing tag additionally requires they were a Regular at some point, or have visited at least
 // this many times.
 export const LAPSING_MIN_VISITS = 3;
+// Two is enough to distinguish a genuine pattern from a one-off (guest overslept, car trouble)
+// without flagging someone off a single missed reservation.
+export const FREQUENT_NO_SHOW_THRESHOLD = 2;
 
 export const AUTO_TAG_REGULAR = "Regular";
 export const AUTO_TAG_LAPSING = "Lapsing";
+export const AUTO_TAG_FREQUENT_NO_SHOW = "Frequent no-show";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -36,9 +40,12 @@ export async function recomputeAutoTags(guestId: string): Promise<void> {
     daysSinceLastVisit >= LAPSING_DAYS_THRESHOLD &&
     (isRegular || wasRegular || guest.visitCount >= LAPSING_MIN_VISITS);
 
+  const isFrequentNoShow = guest.noShowCount >= FREQUENT_NO_SHOW_THRESHOLD;
+
   const autoTags: string[] = [];
   if (isRegular) autoTags.push(AUTO_TAG_REGULAR);
   if (isLapsing) autoTags.push(AUTO_TAG_LAPSING);
+  if (isFrequentNoShow) autoTags.push(AUTO_TAG_FREQUENT_NO_SHOW);
 
   await prisma.guest.update({ where: { id: guestId }, data: { autoTags } });
 }

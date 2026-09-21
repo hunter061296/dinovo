@@ -100,6 +100,9 @@ export async function seedDatabase(prisma: PrismaClient) {
     // visitCount 4 is below the Regular threshold but above LAPSING_MIN_VISITS, and their last
     // completed visit (seeded separately below) is 75 days ago — demonstrates "Lapsing" on its own.
     { firstName: "Grace", lastName: "Lee", phone: "555-0119", email: "grace.lee@example.com", visitCount: 4, tags: [], autoTags: ["Lapsing"] },
+    // noShowCount 2 meets FREQUENT_NO_SHOW_THRESHOLD (see server/src/lib/guestTags.ts) — two
+    // matching NO_SHOW reservations are seeded separately below.
+    { firstName: "Oscar", lastName: "Ruiz", phone: "555-0120", email: "oscar.ruiz@example.com", visitCount: 3, tags: [], autoTags: ["Frequent no-show"], noShowCount: 2 },
   ];
   const guests = await Promise.all(guestDefs.map((g) => prisma.guest.create({ data: g })));
 
@@ -205,6 +208,20 @@ export async function seedDatabase(prisma: PrismaClient) {
       seatedAt: lapsingSeatedAt,
       completedAt: new Date(lapsingSeatedAt.getTime() + 50 * 60_000),
     },
+  });
+
+  // Two past no-shows for the "Frequent no-show" demo guest (Oscar Ruiz).
+  const noShowGuest = guests.find((g) => g.email === "oscar.ruiz@example.com")!;
+  await prisma.reservation.createMany({
+    data: [20, 40].map((daysAgo) => ({
+      guestId: noShowGuest.id,
+      partySize: 2,
+      dateTime: new Date(today.getTime() - daysAgo * 24 * 60 * 60 * 1000 + mins(19) * 60_000),
+      status: "NO_SHOW" as ReservationStatus,
+      tableId: null,
+      shiftId: dinner.id,
+      createdById: host.id,
+    })),
   });
 
   // ---------- Waitlist (a couple of active walk-ins) ----------

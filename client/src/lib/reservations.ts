@@ -9,6 +9,7 @@ export interface Guest {
   phone: string | null;
   email: string | null;
   visitCount: number;
+  noShowCount: number;
   tags: string[];
   // System-inferred tags (e.g. "Regular", "Lapsing") — kept separate from the host-editable
   // `tags` above; see server/src/lib/guestTags.ts. Merge for display, don't conflate the two.

@@ -173,6 +173,15 @@ router.patch("/:id", async (req, res) => {
       });
       await recomputeAutoTags(reservation.guestId);
     }
+    // Same pattern as visitCount above: increment only on the transition into NO_SHOW so
+    // re-saving an already-no-show reservation can't double-count.
+    if (parsed.data.status === "NO_SHOW" && existing.status !== "NO_SHOW") {
+      await prisma.guest.update({
+        where: { id: reservation.guestId },
+        data: { noShowCount: { increment: 1 } },
+      });
+      await recomputeAutoTags(reservation.guestId);
+    }
 
     // Keep the floor plan in sync with the reservation book: seating a reservation occupies its
     // table, and completing it buses the table for cleaning — mirrors the waitlist's seat-now flow.

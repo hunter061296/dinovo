@@ -15,8 +15,13 @@ export function GuestProfileCard({ guest }: { guest: Guest }) {
         <span className="font-medium text-gray-900 dark:text-gray-100">
           {guest.firstName} {guest.lastName}
         </span>
-        <span className="text-xs text-gray-500 dark:text-gray-400">
+        <span className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
           {guest.visitCount} visit{guest.visitCount === 1 ? "" : "s"}
+          {guest.noShowCount > 0 && (
+            <span className={guest.noShowCount >= 2 ? "font-semibold text-red-600 dark:text-red-400" : ""}>
+              · {guest.noShowCount} no-show{guest.noShowCount === 1 ? "" : "s"}
+            </span>
+          )}
         </span>
       </div>
       <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{lastVisitLabel(guest)}</div>
