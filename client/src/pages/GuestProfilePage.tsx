@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { SUGGESTED_TAGS, type GuestDetail } from "../lib/guests";
-import { STATUS_LABELS, STATUS_STYLES } from "../lib/reservations";
+import { STATUS_LABELS, STATUS_STYLES, formatOccasionDate } from "../lib/reservations";
 import { TagBadge } from "../components/TagBadge";
 
 export function GuestProfilePage() {
@@ -18,15 +18,31 @@ export function GuestProfilePage() {
 
   const [notes, setNotes] = useState("");
   const [newTag, setNewTag] = useState("");
+  const [occasion, setOccasion] = useState("");
+  const [occasionMonth, setOccasionMonth] = useState("");
+  const [occasionDay, setOccasionDay] = useState("");
 
   useEffect(() => {
-    if (guest) setNotes(guest.notes ?? "");
+    if (!guest) return;
+    setNotes(guest.notes ?? "");
+    setOccasion(guest.specialOccasion ?? "");
+    const [month, day] = guest.specialOccasionDate ? guest.specialOccasionDate.split("-") : ["", ""];
+    setOccasionMonth(month);
+    setOccasionDay(day);
   }, [guest]);
 
   const updateGuest = useMutation({
-    mutationFn: (data: { tags?: string[]; notes?: string }) => api.patch(`/guests/${id}`, data),
+    mutationFn: (data: { tags?: string[]; notes?: string; specialOccasion?: string | null; specialOccasionDate?: string | null }) =>
+      api.patch(`/guests/${id}`, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["guests", id] }),
   });
+
+  function saveOccasion() {
+    const month = occasionMonth.trim();
+    const day = occasionDay.trim();
+    const specialOccasionDate = month && day ? `${month.padStart(2, "0")}-${day.padStart(2, "0")}` : null;
+    updateGuest.mutate({ specialOccasion: occasion.trim() || null, specialOccasionDate });
+  }
 
   function toggleTag(tag: string) {
     if (!guest) return;
@@ -110,6 +126,57 @@ export function GuestProfilePage() {
             className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             Add
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 p-4">
+        <h2 className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">Special occasion</h2>
+        {guest.specialOccasion && guest.specialOccasionDate && (
+          <p className="mb-2 text-sm text-gray-700 dark:text-gray-300">
+            🎉 {guest.specialOccasion} — {formatOccasionDate(guest.specialOccasionDate)}
+          </p>
+        )}
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="min-w-[160px] flex-1 text-xs text-gray-500 dark:text-gray-400">
+            Occasion
+            <input
+              value={occasion}
+              onChange={(e) => setOccasion(e.target.value)}
+              placeholder="Anniversary, Birthday..."
+              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+            />
+          </label>
+          <label className="w-16 text-xs text-gray-500 dark:text-gray-400">
+            Month
+            <input
+              type="number"
+              min={1}
+              max={12}
+              value={occasionMonth}
+              onChange={(e) => setOccasionMonth(e.target.value)}
+              placeholder="MM"
+              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+            />
+          </label>
+          <label className="w-16 text-xs text-gray-500 dark:text-gray-400">
+            Day
+            <input
+              type="number"
+              min={1}
+              max={31}
+              value={occasionDay}
+              onChange={(e) => setOccasionDay(e.target.value)}
+              placeholder="DD"
+              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+            />
+          </label>
+          <button
+            onClick={saveOccasion}
+            disabled={updateGuest.isPending}
+            className="rounded-md bg-accent-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-700 disabled:opacity-60"
+          >
+            Save
           </button>
         </div>
       </div>

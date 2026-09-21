@@ -71,9 +71,14 @@ router.get("/:id", async (req, res) => {
   res.json(guest);
 });
 
+// Month/day only — deliberately no year, since a birthday/anniversary reminder recurs every year.
+const MMDD_REGEX = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
 const updateGuestSchema = z.object({
   tags: z.array(z.string().min(1)).optional(),
   notes: z.string().optional(),
+  specialOccasion: z.string().trim().max(100).nullable().optional(),
+  specialOccasionDate: z.string().regex(MMDD_REGEX, "specialOccasionDate must be MM-DD").nullable().optional(),
 });
 
 // Open to every role — Hosts and Managers both maintain the guestbook per the product brief.

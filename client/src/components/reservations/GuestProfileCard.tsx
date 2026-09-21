@@ -1,4 +1,4 @@
-import type { Guest } from "../../lib/reservations";
+import { formatOccasionDate, type Guest } from "../../lib/reservations";
 import { TagBadge } from "../TagBadge";
 
 function lastVisitLabel(guest: Guest): string {
@@ -20,6 +20,11 @@ export function GuestProfileCard({ guest }: { guest: Guest }) {
         </span>
       </div>
       <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{lastVisitLabel(guest)}</div>
+      {guest.specialOccasion && guest.specialOccasionDate && (
+        <div className="mt-2 rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+          🎉 {guest.specialOccasion} — {formatOccasionDate(guest.specialOccasionDate)}
+        </div>
+      )}
       {(guest.tags.length > 0 || guest.autoTags.length > 0) && (
         <div className="mt-2 flex flex-wrap gap-1">
           {guest.tags.map((tag) => (

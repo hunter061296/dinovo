@@ -79,7 +79,7 @@ export async function seedDatabase(prisma: PrismaClient) {
   // "Regular" below the auto threshold to show the two are independent.
   console.log("Seeding guests...");
   const guestDefs = [
-    { firstName: "Emma", lastName: "Johnson", phone: "555-0101", email: "emma.johnson@example.com", visitCount: 12, tags: ["VIP", "Regular"], autoTags: ["Regular"] },
+    { firstName: "Emma", lastName: "Johnson", phone: "555-0101", email: "emma.johnson@example.com", visitCount: 12, tags: ["VIP", "Regular"], autoTags: ["Regular"], specialOccasion: "Anniversary", specialOccasionDate: "03-14" },
     { firstName: "Liam", lastName: "Smith", phone: "555-0102", email: "liam.smith@example.com", visitCount: 3, tags: ["Regular"], autoTags: [] },
     { firstName: "Olivia", lastName: "Williams", phone: "555-0103", email: "olivia.w@example.com", visitCount: 0, tags: [], autoTags: [] },
     { firstName: "Noah", lastName: "Brown", phone: "555-0104", email: "noah.brown@example.com", visitCount: 7, tags: ["Allergy"], notes: "Severe peanut allergy — always confirm with kitchen.", autoTags: ["Regular"] },
@@ -87,7 +87,7 @@ export async function seedDatabase(prisma: PrismaClient) {
     { firstName: "Elijah", lastName: "Garcia", phone: "555-0106", email: "elijah.g@example.com", visitCount: 1, tags: [], autoTags: [] },
     { firstName: "Sophia", lastName: "Miller", phone: "555-0107", email: "sophia.miller@example.com", visitCount: 4, tags: ["Regular"], autoTags: [] },
     { firstName: "Mason", lastName: "Davis", phone: "555-0108", email: "mason.davis@example.com", visitCount: 0, tags: [], autoTags: [] },
-    { firstName: "Isabella", lastName: "Rodriguez", phone: "555-0109", email: "isabella.r@example.com", visitCount: 9, tags: ["Regular", "Large Party"], autoTags: ["Regular"] },
+    { firstName: "Isabella", lastName: "Rodriguez", phone: "555-0109", email: "isabella.r@example.com", visitCount: 9, tags: ["Regular", "Large Party"], autoTags: ["Regular"], specialOccasion: "Birthday", specialOccasionDate: "11-02" },
     { firstName: "James", lastName: "Martinez", phone: "555-0110", email: "james.martinez@example.com", visitCount: 2, tags: [], autoTags: [] },
     { firstName: "Mia", lastName: "Hernandez", phone: "555-0111", email: "mia.h@example.com", visitCount: 15, tags: ["VIP", "Regular"], autoTags: ["Regular"] },
     { firstName: "Benjamin", lastName: "Lopez", phone: "555-0112", email: "ben.lopez@example.com", visitCount: 5, tags: [], autoTags: ["Regular"] },
