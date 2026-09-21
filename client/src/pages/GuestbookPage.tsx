@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import type { Guest } from "../lib/reservations";
+import { TagBadge } from "../components/TagBadge";
 
 export function GuestbookPage() {
   const [search, setSearch] = useState("");
@@ -50,12 +51,12 @@ export function GuestbookPage() {
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">{g.phone || g.email || "No contact info"}</div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      {g.tags.slice(0, 3).map((tag) => (
-                        <span key={tag} className="rounded-full bg-accent-100 px-2 py-0.5 text-xs font-medium text-accent-700 dark:bg-accent-800/40 dark:text-accent-300">
-                          {tag}
-                        </span>
-                      ))}
+                    <div className="flex items-center gap-2">
+                      {[...g.tags.map((tag) => ({ tag, auto: false })), ...g.autoTags.map((tag) => ({ tag, auto: true }))]
+                        .slice(0, 3)
+                        .map(({ tag, auto }) => (
+                          <TagBadge key={`${auto ? "auto" : "manual"}-${tag}`} tag={tag} auto={auto} />
+                        ))}
                       <span className="text-xs text-gray-400 dark:text-gray-500">{g.visitCount} visits</span>
                     </div>
                   </Link>

@@ -108,6 +108,11 @@ model Guest {
   email      String?
   visitCount Int      @default(0)
   tags       String[] @default([])
+  // System-computed tags (e.g. "Regular", "Lapsing" — see server/src/lib/guestTags.ts), kept
+  // separate from the manually-edited `tags` above so a host un-tagging something manual is
+  // never re-applied by the next automated pass, and an auto-tag disappearing never touches a
+  // host's manual tags. The UI merges both for display with a visual distinction.
+  autoTags   String[] @default([])
   notes      String?  @db.Text
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt

@@ -1,4 +1,5 @@
 import type { Guest } from "../../lib/reservations";
+import { TagBadge } from "../TagBadge";
 
 function lastVisitLabel(guest: Guest): string {
   const completed = guest.reservations?.find((r) => r.status === "COMPLETED");
@@ -19,15 +20,13 @@ export function GuestProfileCard({ guest }: { guest: Guest }) {
         </span>
       </div>
       <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{lastVisitLabel(guest)}</div>
-      {guest.tags.length > 0 && (
+      {(guest.tags.length > 0 || guest.autoTags.length > 0) && (
         <div className="mt-2 flex flex-wrap gap-1">
           {guest.tags.map((tag) => (
-            <span
-              key={tag}
-              className="rounded-full bg-accent-100 px-2 py-0.5 text-xs font-medium text-accent-700 dark:bg-accent-800/40 dark:text-accent-300"
-            >
-              {tag}
-            </span>
+            <TagBadge key={`manual-${tag}`} tag={tag} />
+          ))}
+          {guest.autoTags.map((tag) => (
+            <TagBadge key={`auto-${tag}`} tag={tag} auto />
           ))}
         </div>
       )}

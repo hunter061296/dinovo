@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { SUGGESTED_TAGS, type GuestDetail } from "../lib/guests";
 import { STATUS_LABELS, STATUS_STYLES } from "../lib/reservations";
+import { TagBadge } from "../components/TagBadge";
 
 export function GuestProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -76,15 +77,14 @@ export function GuestProfilePage() {
         <h2 className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">Tags</h2>
         <div className="mb-3 flex flex-wrap gap-2">
           {guest.tags.map((tag) => (
-            <button
-              key={tag}
-              onClick={() => toggleTag(tag)}
-              className="flex items-center gap-1 rounded-full bg-accent-100 px-3 py-1 text-xs font-medium text-accent-700 hover:bg-accent-200 dark:bg-accent-800/40 dark:text-accent-300 dark:hover:bg-accent-800/60"
-            >
-              {tag} <span aria-hidden>×</span>
-            </button>
+            <TagBadge key={`manual-${tag}`} tag={tag} onRemove={() => toggleTag(tag)} />
           ))}
-          {guest.tags.length === 0 && <span className="text-xs text-gray-400 dark:text-gray-500">No tags yet.</span>}
+          {guest.autoTags.map((tag) => (
+            <TagBadge key={`auto-${tag}`} tag={tag} auto />
+          ))}
+          {guest.tags.length === 0 && guest.autoTags.length === 0 && (
+            <span className="text-xs text-gray-400 dark:text-gray-500">No tags yet.</span>
+          )}
         </div>
         <div className="mb-2 flex flex-wrap gap-2">
           {SUGGESTED_TAGS.filter((t) => !guest.tags.includes(t)).map((tag) => (

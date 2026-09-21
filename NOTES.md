@@ -79,7 +79,11 @@ whether a message actually went out rather than just trusting a button click.
 - **Guestbook (Phase 7)**: no merge/dedup tooling if the same person ends up
   with two profiles (e.g. booked once by phone, once by email with a typo).
   No guest deletion. The "browse all" list is capped at 100 with no
-  pagination.
+  pagination. Auto-tags (`Guest.autoTags`, recomputed in `server/src/lib/
+  guestTags.ts` after a reservation's status changes to COMPLETED/NO_SHOW)
+  use fixed thresholds, easy to tune in one place: **5** completed visits for
+  "Regular", **60** days since the last completed visit (and previously
+  Regular or 3+ visits) for "Lapsing", **2** no-shows for "Frequent no-show".
 - **Pacing (Phase 8)**: slots are fixed at 30 minutes (no 15-minute option),
   and there's no bulk-fill — each slot's cap is set individually, which is
   tedious for configuring a whole shift from scratch. The `maxCovers`/

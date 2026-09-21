@@ -6,6 +6,7 @@ import { authenticate } from "../middleware/auth";
 import { findShiftForDateTime } from "../lib/shiftMatch";
 import { checkPacingCap } from "../lib/pacing";
 import { findConflictingReservation, conflictMessage } from "../lib/tableAvailability";
+import { recomputeAutoTags } from "../lib/guestTags";
 import { getIO } from "../lib/socket";
 
 const router = Router();
@@ -170,6 +171,7 @@ router.patch("/:id", async (req, res) => {
         where: { id: reservation.guestId },
         data: { visitCount: { increment: 1 } },
       });
+      await recomputeAutoTags(reservation.guestId);
     }
 
     // Keep the floor plan in sync with the reservation book: seating a reservation occupies its
