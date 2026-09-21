@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import type { RestaurantTable } from "../lib/tables";
+import { ModalBackdrop, ModalPanel } from "./Modal";
 
 interface Props {
   title: string;
@@ -25,8 +26,8 @@ export function SeatTableModal({ title, subtitle, partySize, preferredTableId, o
     .sort((a, b) => (a.id === preferredTableId ? -1 : b.id === preferredTableId ? 1 : a.number - b.number));
 
   return (
-    <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/30 p-4">
-      <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-lg dark:bg-gray-800">
+    <ModalBackdrop>
+      <ModalPanel className="w-full max-w-sm rounded-lg bg-white p-5 shadow-lg dark:bg-gray-800">
         <h2 className="mb-1 text-lg font-semibold text-gray-900 dark:text-gray-100">Seat {title}</h2>
         <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
 
@@ -61,7 +62,7 @@ export function SeatTableModal({ title, subtitle, partySize, preferredTableId, o
             Close
           </button>
         </div>
-      </div>
-    </div>
+      </ModalPanel>
+    </ModalBackdrop>
   );
 }

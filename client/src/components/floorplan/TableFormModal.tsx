@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import type { RestaurantTable, Section, TableShape } from "../../lib/tables";
+import { ModalBackdrop, ModalPanel } from "../Modal";
 
 interface Props {
   initial?: RestaurantTable;
@@ -23,8 +24,8 @@ export function TableFormModal({ initial, sections, onSubmit, onDelete, onClose,
   }
 
   return (
-    <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/30 p-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm rounded-lg bg-white p-5 shadow-lg dark:bg-gray-800">
+    <ModalBackdrop>
+      <ModalPanel as="form" onSubmit={handleSubmit} className="w-full max-w-sm rounded-lg bg-white p-5 shadow-lg dark:bg-gray-800">
         <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">{initial ? `Edit table ${initial.number}` : "Add table"}</h2>
 
         {error && <div className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">{error}</div>}
@@ -108,7 +109,7 @@ export function TableFormModal({ initial, sections, onSubmit, onDelete, onClose,
             </button>
           </div>
         </div>
-      </form>
-    </div>
+      </ModalPanel>
+    </ModalBackdrop>
   );
 }

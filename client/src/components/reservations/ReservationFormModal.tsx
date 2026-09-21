@@ -6,6 +6,7 @@ import type { Reservation, ReservationStatus, Shift } from "../../lib/reservatio
 import { STATUS_LABELS } from "../../lib/reservations";
 import { coversInSlot, findPacingRule } from "../../lib/pacing";
 import { GuestPicker, type NewGuestInput } from "./GuestPicker";
+import { ModalBackdrop, ModalPanel } from "../Modal";
 
 export interface ReservationFormValues {
   guestId?: string;
@@ -101,8 +102,12 @@ export function ReservationFormModal({
   const canSubmit = guest || (newGuest && newGuest.firstName && newGuest.lastName);
 
   return (
-    <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/30 p-4">
-      <form onSubmit={handleSubmit} className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-5 shadow-lg dark:bg-gray-800">
+    <ModalBackdrop>
+      <ModalPanel
+        as="form"
+        onSubmit={handleSubmit}
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-5 shadow-lg dark:bg-gray-800"
+      >
         <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">{initial ? "Edit reservation" : "New reservation"}</h2>
 
         {error && <div className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">{error}</div>}
@@ -219,7 +224,7 @@ export function ReservationFormModal({
             </button>
           </div>
         </div>
-      </form>
-    </div>
+      </ModalPanel>
+    </ModalBackdrop>
   );
 }

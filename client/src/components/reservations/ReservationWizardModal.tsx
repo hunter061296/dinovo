@@ -8,6 +8,7 @@ import type { RestaurantTable } from "../../lib/tables";
 import { GuestPicker, type NewGuestInput } from "./GuestPicker";
 import { MiniCalendar } from "./MiniCalendar";
 import type { ReservationFormValues } from "./ReservationFormModal";
+import { ModalBackdrop, ModalPanel } from "../Modal";
 
 const STEPS = ["Date", "Party", "Time", "Guest", "Summary"] as const;
 type Step = (typeof STEPS)[number];
@@ -121,8 +122,8 @@ export function ReservationWizardModal({ initialDate, onSubmit, onClose, submitt
   }
 
   return (
-    <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/30 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-white shadow-lg dark:bg-gray-800">
+    <ModalBackdrop>
+      <ModalPanel className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-white shadow-lg dark:bg-gray-800">
         {/* Step indicator */}
         <div className="flex items-center gap-1 border-b border-gray-100 px-5 pb-3 pt-4 dark:border-gray-700">
           {STEPS.map((s, i) => (
@@ -310,7 +311,7 @@ export function ReservationWizardModal({ initialDate, onSubmit, onClose, submitt
             </button>
           )}
         </div>
-      </div>
-    </div>
+      </ModalPanel>
+    </ModalBackdrop>
   );
 }
