@@ -1,6 +1,13 @@
 import { useState, type FormEvent } from "react";
 import type { RestaurantTable, Section, TableShape } from "../../lib/tables";
 import { ModalBackdrop, ModalPanel } from "../Modal";
+import { TableShapeIcon } from "./TableShapeIcon";
+
+const SHAPES: { value: TableShape; label: string }[] = [
+  { value: "ROUND", label: "Round" },
+  { value: "SQUARE", label: "Square" },
+  { value: "RECTANGLE", label: "Rectangle" },
+];
 
 interface Props {
   initial?: RestaurantTable;
@@ -52,18 +59,27 @@ export function TableFormModal({ initial, sections, onSubmit, onDelete, onClose,
             className="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
           />
         </label>
-        <label className="mb-3 block text-sm">
-          <span className="mb-1 block font-medium text-gray-700 dark:text-gray-300">Shape</span>
-          <select
-            value={shape}
-            onChange={(e) => setShape(e.target.value as TableShape)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-          >
-            <option value="ROUND">Round</option>
-            <option value="SQUARE">Square</option>
-            <option value="RECTANGLE">Rectangle</option>
-          </select>
-        </label>
+        <div className="mb-3">
+          <span className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Shape</span>
+          <div className="grid grid-cols-3 gap-2">
+            {SHAPES.map((s) => (
+              <button
+                key={s.value}
+                type="button"
+                onClick={() => setShape(s.value)}
+                aria-pressed={shape === s.value}
+                className={`flex flex-col items-center gap-1 rounded-md border px-2 py-2 text-xs font-medium ${
+                  shape === s.value
+                    ? "border-accent-400 bg-accent-50 text-accent-700 dark:border-accent-600 dark:bg-accent-900/30 dark:text-accent-300"
+                    : "border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+                }`}
+              >
+                <TableShapeIcon shape={s.value} />
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <label className="mb-5 block text-sm">
           <span className="mb-1 block font-medium text-gray-700 dark:text-gray-300">Section</span>
           <select

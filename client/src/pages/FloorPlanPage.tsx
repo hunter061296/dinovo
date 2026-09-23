@@ -161,7 +161,10 @@ export function FloorPlanPage() {
     onError: (_err, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(["tables"], context.previous);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["tables"] }),
+    // No onSettled invalidate here: the server's own "table:updated" socket broadcast (handled by
+    // the effect above) already reconciles the cache with the confirmed position. Invalidating on
+    // every drop forced an extra full refetch that could resolve after a *later* drag's optimistic
+    // update, snapping that table back to its pre-drag position — the glitchy-drag bug.
   });
 
   const createTable = useMutation({
