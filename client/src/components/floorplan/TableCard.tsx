@@ -52,10 +52,11 @@ export function TableCard({ table, draggable, onClick, scale = 1, seatedGuestNam
     // the cursor sometimes vanishing mid-drag.
     touchAction: draggable ? "none" : undefined,
     willChange: isDragging ? "transform" : undefined,
-    // Driven from JS state rather than a Tailwind `active:` class — once pointer capture takes
-    // over during a drag, `:active` stops reliably matching in some browsers, which is the other
-    // half of the disappearing-cursor bug.
-    cursor: draggable ? (isDragging ? "grabbing" : "grab") : "pointer",
+    // Static, not toggled by isDragging: Chrome has a bug where dynamically changing `cursor` on
+    // an element that currently has pointer capture (dnd-kit uses setPointerCapture for every
+    // drag) can leave the cursor invisible after the drag ends. The "grabbing" cursor during an
+    // active drag is instead forced globally via the .table-dragging class in index.css.
+    cursor: draggable ? "grab" : "pointer",
   };
 
   const showsReservationBadge = table.status === "OPEN" && !!upcomingReservation;
