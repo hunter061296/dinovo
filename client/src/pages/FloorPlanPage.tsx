@@ -200,7 +200,19 @@ export function FloorPlanPage() {
     },
   });
 
+  // Forces the "grabbing" cursor globally for the duration of a drag (see the .table-dragging
+  // rule in index.css) rather than toggling `cursor` on the dragged element itself, which is
+  // what triggers a Chrome bug that leaves the cursor invisible after a drag ends.
+  function handleDragStart() {
+    document.body.classList.add("table-dragging");
+  }
+
+  function handleDragCancel() {
+    document.body.classList.remove("table-dragging");
+  }
+
   function handleDragEnd(event: DragEndEvent) {
+    document.body.classList.remove("table-dragging");
     const table = tables?.find((t) => t.id === event.active.id);
     if (!table) return;
     // Pointer movement is in screen pixels, but table positions live in unscaled canvas
@@ -240,7 +252,7 @@ export function FloorPlanPage() {
           {/* No restrictToParentElement modifier here — it measures the parent's scaled screen
               rect, which doesn't line up with the child's own (unscaled) transform space once the
               canvas is zoomed/shrunk. handleDragEnd already clamps to canvas bounds on drop. */}
-          <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
             {(() => {
               const canvasHeight = Math.max(CANVAS_HEIGHT - 40, ...displayedTables.map((t) => t.positionY + 220), 200);
               return (

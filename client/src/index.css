@@ -99,3 +99,13 @@ body {
   color: #e5e7eb;
   color-scheme: dark;
 }
+
+/* Floor plan table dragging (dnd-kit) forces the "grabbing" cursor globally via this class
+   instead of toggling `cursor` on the dragged element itself. Chrome has a long-standing bug
+   where dynamically changing `cursor` on an element that currently has pointer capture
+   (setPointerCapture, which dnd-kit uses for every drag) can leave the cursor invisible until
+   the pointer leaves and re-enters the window. Setting it globally here sidesteps that. */
+body.table-dragging,
+body.table-dragging * {
+  cursor: grabbing !important;
+}
