@@ -149,22 +149,13 @@ export function FloorPlanPage() {
   const moveTable = useMutation({
     mutationFn: ({ id, positionX, positionY }: { id: string; positionX: number; positionY: number }) =>
       api.patch(`/tables/${id}`, { positionX, positionY }),
-    // Optimistic update so the drag feels instant instead of snapping back while the request is in flight.
-    onMutate: async ({ id, positionX, positionY }) => {
-      await queryClient.cancelQueries({ queryKey: ["tables"] });
-      const previous = queryClient.getQueryData<RestaurantTable[]>(["tables"]);
-      queryClient.setQueryData<RestaurantTable[]>(["tables"], (old) =>
-        old?.map((t) => (t.id === id ? { ...t, positionX, positionY } : t))
-      );
-      return { previous };
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previous) queryClient.setQueryData(["tables"], context.previous);
-    },
     // No onSettled invalidate here: the server's own "table:updated" socket broadcast (handled by
     // the effect above) already reconciles the cache with the confirmed position. Invalidating on
     // every drop forced an extra full refetch that could resolve after a *later* drag's optimistic
     // update, snapping that table back to its pre-drag position — the glitchy-drag bug.
+    // No onMutate either — handleDragEnd below applies the optimistic update itself, synchronously,
+    // to avoid a one-tick-late race with dnd-kit resetting its drag transform (see there). Rollback
+    // on error is handled per-call, via the closure in handleDragEnd, for the same reason.
   });
 
   const createTable = useMutation({
@@ -219,7 +210,20 @@ export function FloorPlanPage() {
     // coordinates — divide out the scale so dragging feels 1:1 even when the canvas is zoomed/shrunk.
     const nextX = Math.max(0, Math.min(CANVAS_WIDTH - 60, table.positionX + event.delta.x / scale));
     const nextY = Math.max(0, Math.min(CANVAS_HEIGHT - 60, table.positionY + event.delta.y / scale));
-    moveTable.mutate({ id: table.id, positionX: nextX, positionY: nextY });
+
+    // dnd-kit resets its internal drag transform to null in this same synchronous event, so the
+    // table's base positionX/positionY must already reflect the drop location by the time that
+    // commits — otherwise there's one visible frame with neither the drag offset nor the new
+    // position (the released-and-it-glitches snap). useMutation's own onMutate runs a microtask
+    // later, which is one tick too late, so the cache update happens here instead, synchronously.
+    const previous = queryClient.getQueryData<RestaurantTable[]>(["tables"]);
+    queryClient.setQueryData<RestaurantTable[]>(["tables"], (old) =>
+      old?.map((t) => (t.id === table.id ? { ...t, positionX: nextX, positionY: nextY } : t))
+    );
+    moveTable.mutate(
+      { id: table.id, positionX: nextX, positionY: nextY },
+      { onError: () => previous && queryClient.setQueryData(["tables"], previous) }
+    );
   }
 
   return (
@@ -269,10 +273,18 @@ export function FloorPlanPage() {
                   >
                     <div
                       className="relative origin-top-left"
-                      // will-change promotes this to its own compositing layer, so dragging a
-                      // table only repaints that table rather than the browser potentially
-                      // repainting this whole scaled canvas on every drag frame.
-                      style={{ width: CANVAS_WIDTH, height: canvasHeight, transform: `scale(${scale})`, willChange: "transform" }}
+                      style={{
+                        width: CANVAS_WIDTH,
+                        height: canvasHeight,
+                        // Only apply the transform when it actually does something. Chrome has a
+                        // compositing bug where the cursor can render behind (rather than on top
+                        // of) a descendant of a *transformed* ancestor — including transform:
+                        // scale(1), a literal no-op — so on a desktop window wide enough that no
+                        // shrinking is needed (scale === 1, the common case), skip it entirely
+                        // rather than pay for a broken compositing context for nothing.
+                        transform: scale !== 1 ? `scale(${scale})` : undefined,
+                        willChange: scale !== 1 ? "transform" : undefined,
+                      }}
                     >
                       {displayedTables.length === 0 && (
                         <div className="flex h-full items-center justify-center text-sm text-gray-400 dark:text-gray-500">

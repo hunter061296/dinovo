@@ -52,11 +52,13 @@ export function TableCard({ table, draggable, onClick, scale = 1, seatedGuestNam
     // the cursor sometimes vanishing mid-drag.
     touchAction: draggable ? "none" : undefined,
     willChange: isDragging ? "transform" : undefined,
-    // Static, not toggled by isDragging: Chrome has a bug where dynamically changing `cursor` on
-    // an element that currently has pointer capture (dnd-kit uses setPointerCapture for every
-    // drag) can leave the cursor invisible after the drag ends. The "grabbing" cursor during an
-    // active drag is instead forced globally via the .table-dragging class in index.css.
-    cursor: draggable ? "grab" : "pointer",
+    // cursor is deliberately NOT set here (see the cursor-grab/cursor-pointer classes below
+    // instead): an inline style object is a new reference on every render, which Chrome's cursor
+    // repaint logic can treat as a change even when the value is identical — on a descendant of a
+    // transformed (scaled) ancestor, like every table here, that's enough to trigger a Chrome bug
+    // where the cursor renders behind the element instead of on top of it. A static class isn't
+    // re-applied on every render, so it doesn't retrigger the bug. The "grabbing" cursor during an
+    // active drag is forced globally via the .table-dragging class in index.css instead.
   };
 
   const showsReservationBadge = table.status === "OPEN" && !!upcomingReservation;
@@ -68,8 +70,10 @@ export function TableCard({ table, draggable, onClick, scale = 1, seatedGuestNam
       style={style}
       onClick={onClick}
       className={`flex flex-col items-center justify-center border-2 px-1 text-sm font-medium shadow-sm transition-shadow hover:shadow-md ${
-        table.shape === "ROUND" ? "rounded-full" : "rounded-lg"
-      } ${STATUS_STYLES[table.status]} ${showsReservationBadge ? "ring-2 ring-amber-400 dark:ring-amber-500" : ""}`}
+        draggable ? "cursor-grab" : "cursor-pointer"
+      } ${table.shape === "ROUND" ? "rounded-full" : "rounded-lg"} ${STATUS_STYLES[table.status]} ${
+        showsReservationBadge ? "ring-2 ring-amber-400 dark:ring-amber-500" : ""
+      }`}
       {...(draggable ? { ...listeners, ...attributes } : {})}
     >
       <span className="font-semibold">#{table.number}</span>
