@@ -10,6 +10,8 @@ import { ReservationFormModal, type ReservationFormValues } from "../components/
 import { ReservationWizardModal } from "../components/reservations/ReservationWizardModal";
 import { DURATION, useMotionDuration } from "../lib/motion";
 import { listChipVariants } from "../lib/listMotion";
+import { markTableSelfUpdated } from "../lib/selfUpdatedTables";
+import { markReservationSelfCreated } from "../lib/selfInitiated";
 
 const SLOT_MINUTES = 30;
 
@@ -70,7 +72,10 @@ export function ReservationsPage() {
   }, [reservations]);
 
   const createReservation = useMutation({
-    mutationFn: (values: ReservationFormValues) => api.post("/reservations", values),
+    mutationFn: (values: ReservationFormValues) => {
+      markReservationSelfCreated();
+      return api.post("/reservations", values);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reservations", date] });
       setModal(null);
@@ -80,8 +85,15 @@ export function ReservationsPage() {
   });
 
   const updateReservation = useMutation({
-    mutationFn: ({ id, values }: { id: string; values: Partial<ReservationFormValues> }) =>
-      api.patch(`/reservations/${id}`, values),
+    mutationFn: ({ id, values }: { id: string; values: Partial<ReservationFormValues> }) => {
+      // Seating/completing a reservation also updates its table server-side (see
+      // server/src/routes/reservations.ts) — mark that table as self-updated too, so the toast
+      // for "table status changed remotely" doesn't fire for a change this screen just made.
+      if ((values.status === "SEATED" || values.status === "COMPLETED") && values.tableId) {
+        markTableSelfUpdated(values.tableId);
+      }
+      return api.patch(`/reservations/${id}`, values);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reservations", date] });
       setModal(null);

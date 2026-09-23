@@ -93,6 +93,7 @@ router.post("/", async (req, res) => {
   if (cap.overCap) {
     console.warn(`[pacing] reservation ${reservation.id} exceeds cap: ${cap.capDetail}`);
   }
+  getIO().emit("reservation:created", reservation);
   res.status(201).json({ ...reservation, overCap: cap.overCap, capDetail: cap.capDetail });
 });
 

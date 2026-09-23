@@ -7,6 +7,8 @@ import { minutesSince, type WaitlistEntry } from "../lib/waitlist";
 import { SeatTableModal } from "../components/SeatTableModal";
 import { DURATION, useMotionDuration } from "../lib/motion";
 import { listRowVariants } from "../lib/listMotion";
+import { markTableSelfUpdated } from "../lib/selfUpdatedTables";
+import { markWaitlistEntrySelfUpdated } from "../lib/selfInitiated";
 
 export function WaitlistPage() {
   const queryClient = useQueryClient();
@@ -52,12 +54,19 @@ export function WaitlistPage() {
   });
 
   const cancelEntry = useMutation({
-    mutationFn: (id: string) => api.patch(`/waitlist/${id}`, { status: "CANCELLED" }),
+    mutationFn: (id: string) => {
+      markWaitlistEntrySelfUpdated(id);
+      return api.patch(`/waitlist/${id}`, { status: "CANCELLED" });
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["waitlist"] }),
   });
 
   const seatEntry = useMutation({
-    mutationFn: ({ id, tableId }: { id: string; tableId: string }) => api.post(`/waitlist/${id}/seat`, { tableId }),
+    mutationFn: ({ id, tableId }: { id: string; tableId: string }) => {
+      markWaitlistEntrySelfUpdated(id);
+      markTableSelfUpdated(tableId);
+      return api.post(`/waitlist/${id}/seat`, { tableId });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["waitlist"] });
       queryClient.invalidateQueries({ queryKey: ["tables"] });
