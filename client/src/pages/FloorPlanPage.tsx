@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragMoveEvent, type Modifier } from "@dnd-kit/core";
+import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent, type Modifier } from "@dnd-kit/core";
 import { AnimatePresence } from "motion/react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
@@ -62,8 +62,6 @@ export function FloorPlanPage() {
 
   // Positions of just-dropped tables, held until their save settles — see handleDragEnd.
   const [droppedPositions, setDroppedPositions] = useState<Record<string, { positionX: number; positionY: number }>>({});
-  // Alignment lines (canvas coordinates) to draw while a table is being dragged.
-  const [guides, setGuides] = useState<{ x: number | null; y: number | null } | null>(null);
 
   const displayedTables = (tables ?? [])
     .filter((t) => !selectedSectionId || t.sectionId === selectedSectionId)
@@ -206,7 +204,6 @@ export function FloorPlanPage() {
 
   function handleDragCancel() {
     document.body.classList.remove("table-dragging");
-    setGuides(null);
   }
 
   // Pointer movement is in screen pixels, but table positions live in unscaled canvas
@@ -227,18 +224,8 @@ export function FloorPlanPage() {
     return { ...transform, x: (x - table.positionX) * scale, y: (y - table.positionY) * scale };
   };
 
-  function handleDragMove(event: DragMoveEvent) {
-    const table = displayedTables.find((t) => t.id === event.active.id);
-    if (!table) return;
-    // delta already includes snapModifier's output, so this re-snap reports the line it aligned to.
-    const { guideX, guideY } = snappedDropPosition(table, event.delta.x, event.delta.y);
-    // Bail out (return prev) unless the lines changed, so moves don't re-render the whole page.
-    setGuides((prev) => (prev && prev.x === guideX && prev.y === guideY ? prev : { x: guideX, y: guideY }));
-  }
-
   function handleDragEnd(event: DragEndEvent) {
     document.body.classList.remove("table-dragging");
-    setGuides(null);
     const table = displayedTables.find((t) => t.id === event.active.id);
     if (!table) return;
     // delta already includes snapModifier's output; snapping again is a no-op except when the
@@ -304,7 +291,6 @@ export function FloorPlanPage() {
             sensors={sensors}
             modifiers={[snapModifier]}
             onDragStart={handleDragStart}
-            onDragMove={handleDragMove}
             onDragEnd={handleDragEnd}
             onDragCancel={handleDragCancel}
           >
@@ -357,12 +343,6 @@ export function FloorPlanPage() {
                           upcomingReservation={upcomingByTable.get(table.id) ?? null}
                         />
                       ))}
-                      {guides?.x != null && (
-                        <div className="pointer-events-none absolute top-0 bottom-0 z-20 w-px bg-accent-500/70" style={{ left: guides.x }} />
-                      )}
-                      {guides?.y != null && (
-                        <div className="pointer-events-none absolute left-0 right-0 z-20 h-px bg-accent-500/70" style={{ top: guides.y }} />
-                      )}
                     </div>
                   </div>
 
