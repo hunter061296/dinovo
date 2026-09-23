@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { AnimatePresence, motion } from "motion/react";
 import { api } from "../../lib/api";
 import type { Reservation, Shift } from "../../lib/reservations";
 import { minutesToLabel } from "../../lib/reservations";
@@ -9,6 +10,15 @@ import { GuestPicker, type NewGuestInput } from "./GuestPicker";
 import { MiniCalendar } from "./MiniCalendar";
 import type { ReservationFormValues } from "./ReservationFormModal";
 import { ModalBackdrop, ModalPanel } from "../Modal";
+import { DURATION, useMotionDuration } from "../../lib/motion";
+
+// Slide distance is deliberately small (24px) — this should read as a quick directional cue
+// between steps, not a slide-show transition.
+const stepVariants = {
+  enter: (direction: number) => ({ x: direction > 0 ? 24 : -24, opacity: 0 }),
+  center: { x: 0, opacity: 1 },
+  exit: (direction: number) => ({ x: direction > 0 ? -24 : 24, opacity: 0 }),
+};
 
 const STEPS = ["Date", "Party", "Time", "Guest", "Summary"] as const;
 type Step = (typeof STEPS)[number];
@@ -38,6 +48,9 @@ interface Props {
 
 export function ReservationWizardModal({ initialDate, onSubmit, onClose, submitting, error }: Props) {
   const [stepIndex, setStepIndex] = useState(0);
+  // +1 = advancing via Next (slide in from the right), -1 = Back (slide in from the left).
+  const [direction, setDirection] = useState(1);
+  const stepDuration = useMotionDuration(DURATION.fast);
   const [date, setDate] = useState(initialDate ?? todayLocalISODate());
   const [partySize, setPartySize] = useState<number>(2);
   const [slotMinutes, setSlotMinutes] = useState<number | null>(null);
@@ -101,10 +114,16 @@ export function ReservationWizardModal({ initialDate, onSubmit, onClose, submitt
   }
 
   function goNext() {
-    if (stepIndex < STEPS.length - 1) setStepIndex((i) => i + 1);
+    if (stepIndex < STEPS.length - 1) {
+      setDirection(1);
+      setStepIndex((i) => i + 1);
+    }
   }
   function goBack() {
-    if (stepIndex > 0) setStepIndex((i) => i - 1);
+    if (stepIndex > 0) {
+      setDirection(-1);
+      setStepIndex((i) => i - 1);
+    }
   }
 
   function handleConfirm() {
@@ -144,7 +163,18 @@ export function ReservationWizardModal({ initialDate, onSubmit, onClose, submitt
           ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-4">
+        <div className="flex-1 overflow-hidden px-5 py-4">
+        <AnimatePresence mode="wait" custom={direction} initial={false}>
+          <motion.div
+            key={step}
+            custom={direction}
+            variants={stepVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: stepDuration, ease: "easeInOut" }}
+            className="h-full overflow-y-auto"
+          >
           <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
             {step === "Date" && "Pick a date"}
             {step === "Party" && "Party size"}
@@ -281,6 +311,8 @@ export function ReservationWizardModal({ initialDate, onSubmit, onClose, submitt
               </label>
             </div>
           )}
+          </motion.div>
+        </AnimatePresence>
         </div>
 
         <div className="flex items-center justify-between gap-2 border-t border-gray-100 px-5 py-3 dark:border-gray-700">
