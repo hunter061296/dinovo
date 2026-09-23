@@ -5,8 +5,21 @@ import { AnimatePresence, motion } from "motion/react";
 import { api } from "../lib/api";
 import type { Guest } from "../lib/reservations";
 import { TagBadge } from "../components/TagBadge";
+import { Skeleton } from "../components/Skeleton";
 import { DURATION, useMotionDuration } from "../lib/motion";
 import { listRowVariants } from "../lib/listMotion";
+
+function GuestRowSkeleton() {
+  return (
+    <div className="flex items-center justify-between px-4 py-3">
+      <div className="flex flex-col gap-1.5">
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-3 w-24" />
+      </div>
+      <Skeleton className="h-3 w-16" />
+    </div>
+  );
+}
 
 export function GuestbookPage() {
   const [search, setSearch] = useState("");
@@ -37,7 +50,13 @@ export function GuestbookPage() {
         className="rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
       />
 
-      {isLoading && <div className="text-sm text-gray-500 dark:text-gray-400">Loading guests...</div>}
+      {isLoading && (
+        <div className="divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-200 bg-white dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-800">
+          {Array.from({ length: 6 }, (_, i) => (
+            <GuestRowSkeleton key={i} />
+          ))}
+        </div>
+      )}
       {isError && <div className="text-sm text-red-600 dark:text-red-400">Failed to load guests.</div>}
 
       {guests && (

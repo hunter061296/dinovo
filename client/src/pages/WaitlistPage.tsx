@@ -5,10 +5,26 @@ import { api } from "../lib/api";
 import { getSocket } from "../lib/socket";
 import { minutesSince, type WaitlistEntry } from "../lib/waitlist";
 import { SeatTableModal } from "../components/SeatTableModal";
+import { Skeleton } from "../components/Skeleton";
 import { DURATION, useMotionDuration } from "../lib/motion";
 import { listRowVariants } from "../lib/listMotion";
 import { markTableSelfUpdated } from "../lib/selfUpdatedTables";
 import { markWaitlistEntrySelfUpdated } from "../lib/selfInitiated";
+
+function WaitlistRowSkeleton() {
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <div className="flex flex-col gap-1.5">
+        <Skeleton className="h-4 w-40" />
+        <Skeleton className="h-3 w-56" />
+      </div>
+      <div className="flex shrink-0 gap-2">
+        <Skeleton className="h-7 w-20" />
+        <Skeleton className="h-7 w-16" />
+      </div>
+    </div>
+  );
+}
 
 export function WaitlistPage() {
   const queryClient = useQueryClient();
@@ -127,7 +143,13 @@ export function WaitlistPage() {
         </button>
       </form>
 
-      {isLoading && <div className="text-sm text-gray-500 dark:text-gray-400">Loading waitlist...</div>}
+      {isLoading && (
+        <div className="divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-200 bg-white dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-800">
+          {Array.from({ length: 3 }, (_, i) => (
+            <WaitlistRowSkeleton key={i} />
+          ))}
+        </div>
+      )}
       {isError && <div className="text-sm text-red-600 dark:text-red-400">Failed to load the waitlist.</div>}
 
       {entries && (

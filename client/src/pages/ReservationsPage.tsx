@@ -8,10 +8,26 @@ import type { Reservation } from "../lib/reservations";
 import { coversInSlot, findPacingRule } from "../lib/pacing";
 import { ReservationFormModal, type ReservationFormValues } from "../components/reservations/ReservationFormModal";
 import { ReservationWizardModal } from "../components/reservations/ReservationWizardModal";
+import { Skeleton } from "../components/Skeleton";
 import { DURATION, useMotionDuration } from "../lib/motion";
 import { listChipVariants } from "../lib/listMotion";
 import { markTableSelfUpdated } from "../lib/selfUpdatedTables";
 import { markReservationSelfCreated } from "../lib/selfInitiated";
+
+function SlotRowSkeleton({ chipWidths }: { chipWidths: number[] }) {
+  return (
+    <div className="flex border-t border-gray-100 first:border-t-0 dark:border-gray-700">
+      <div className="w-24 shrink-0 border-r border-gray-100 bg-gray-50 px-3 py-2 dark:border-gray-700 dark:bg-gray-900">
+        <Skeleton className="h-3 w-12" />
+      </div>
+      <div className="flex flex-1 flex-wrap items-center gap-2 p-2">
+        {chipWidths.map((w, i) => (
+          <Skeleton key={i} className="h-9" style={{ width: w }} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const SLOT_MINUTES = 30;
 
@@ -125,7 +141,15 @@ export function ReservationsPage() {
         </div>
       </div>
 
-      {isLoading && <div className="text-sm text-gray-500 dark:text-gray-400">Loading reservations...</div>}
+      {isLoading && (
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+          <SlotRowSkeleton chipWidths={[110]} />
+          <SlotRowSkeleton chipWidths={[130, 90]} />
+          <SlotRowSkeleton chipWidths={[]} />
+          <SlotRowSkeleton chipWidths={[100, 100, 90]} />
+          <SlotRowSkeleton chipWidths={[120]} />
+        </div>
+      )}
       {isError && <div className="text-sm text-red-600 dark:text-red-400">Failed to load reservations.</div>}
       {!isLoading && !isError && shifts && shifts.length === 0 && (
         <div className="text-sm text-gray-500 dark:text-gray-400">No shifts are configured yet, so there's no timeline to show.</div>
