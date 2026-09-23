@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragMoveEvent, type Modifier } from "@dnd-kit/core";
 import { AnimatePresence } from "motion/react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
@@ -8,6 +8,7 @@ import { getSocket } from "../lib/socket";
 import type { RestaurantTable, Section, SeatedSummaryEntry, TableShape } from "../lib/tables";
 import type { Reservation } from "../lib/reservations";
 import { minutesToLabel } from "../lib/reservations";
+import { snapTablePosition } from "../lib/floorplanSnap";
 import { TableCard } from "../components/floorplan/TableCard";
 import { TableFormModal } from "../components/floorplan/TableFormModal";
 import { TableStatusPopover } from "../components/floorplan/TableStatusPopover";
@@ -61,6 +62,8 @@ export function FloorPlanPage() {
 
   // Positions of just-dropped tables, held until their save settles — see handleDragEnd.
   const [droppedPositions, setDroppedPositions] = useState<Record<string, { positionX: number; positionY: number }>>({});
+  // Alignment lines (canvas coordinates) to draw while a table is being dragged.
+  const [guides, setGuides] = useState<{ x: number | null; y: number | null } | null>(null);
 
   const displayedTables = (tables ?? [])
     .filter((t) => !selectedSectionId || t.sectionId === selectedSectionId)
@@ -203,22 +206,50 @@ export function FloorPlanPage() {
 
   function handleDragCancel() {
     document.body.classList.remove("table-dragging");
+    setGuides(null);
+  }
+
+  // Pointer movement is in screen pixels, but table positions live in unscaled canvas
+  // coordinates — divide out the scale so dragging feels 1:1 even when the canvas is zoomed/shrunk.
+  function snappedDropPosition(table: RestaurantTable, dx: number, dy: number) {
+    const others = displayedTables.filter((t) => t.id !== table.id);
+    return snapTablePosition(table, others, table.positionX + dx / scale, table.positionY + dy / scale, {
+      maxX: CANVAS_WIDTH - 60,
+      maxY: CANVAS_HEIGHT - 60,
+    });
+  }
+
+  // Snaps the live drag preview, so the table visibly clicks into alignment while it moves.
+  const snapModifier: Modifier = ({ transform, active }) => {
+    const table = active && displayedTables.find((t) => t.id === active.id);
+    if (!table) return transform;
+    const { x, y } = snappedDropPosition(table, transform.x, transform.y);
+    return { ...transform, x: (x - table.positionX) * scale, y: (y - table.positionY) * scale };
+  };
+
+  function handleDragMove(event: DragMoveEvent) {
+    const table = displayedTables.find((t) => t.id === event.active.id);
+    if (!table) return;
+    // delta already includes snapModifier's output, so this re-snap reports the line it aligned to.
+    const { guideX, guideY } = snappedDropPosition(table, event.delta.x, event.delta.y);
+    // Bail out (return prev) unless the lines changed, so moves don't re-render the whole page.
+    setGuides((prev) => (prev && prev.x === guideX && prev.y === guideY ? prev : { x: guideX, y: guideY }));
   }
 
   function handleDragEnd(event: DragEndEvent) {
     document.body.classList.remove("table-dragging");
-    const table = tables?.find((t) => t.id === event.active.id);
+    setGuides(null);
+    const table = displayedTables.find((t) => t.id === event.active.id);
     if (!table) return;
-    // Pointer movement is in screen pixels, but table positions live in unscaled canvas
-    // coordinates — divide out the scale so dragging feels 1:1 even when the canvas is zoomed/shrunk.
-    const nextX = Math.max(0, Math.min(CANVAS_WIDTH - 60, table.positionX + event.delta.x / scale));
-    const nextY = Math.max(0, Math.min(CANVAS_HEIGHT - 60, table.positionY + event.delta.y / scale));
+    // delta already includes snapModifier's output; snapping again is a no-op except when the
+    // container auto-scrolled mid-drag, where it re-aligns the final position.
+    const { x: nextX, y: nextY } = snappedDropPosition(table, event.delta.x, event.delta.y);
 
     // dnd-kit drops its drag transform in this same event, so the table's base position must
     // already be the drop location when that commits — otherwise there's one frame at the old
-    // position (the snap-back on release). setQueryData alone isn't enough: React Query notifies components on its own scheduler
-    // (setTimeout), so the re-render would still land a frame after dnd-kit's reset. Plain React
-    // state set here is batched into the same commit as dnd-kit's own state update.
+    // position (the snap-back on release). setQueryData alone isn't enough: React Query notifies
+    // components on its own scheduler (setTimeout), so that re-render lands a frame late. Plain
+    // React state set here is batched into the same commit as dnd-kit's own state update.
     setDroppedPositions((prev) => ({ ...prev, [table.id]: { positionX: nextX, positionY: nextY } }));
     const clearDropped = () =>
       setDroppedPositions((prev) => {
@@ -269,7 +300,14 @@ export function FloorPlanPage() {
           {/* No restrictToParentElement modifier here — it measures the parent's scaled screen
               rect, which doesn't line up with the child's own (unscaled) transform space once the
               canvas is zoomed/shrunk. handleDragEnd already clamps to canvas bounds on drop. */}
-          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
+          <DndContext
+            sensors={sensors}
+            modifiers={[snapModifier]}
+            onDragStart={handleDragStart}
+            onDragMove={handleDragMove}
+            onDragEnd={handleDragEnd}
+            onDragCancel={handleDragCancel}
+          >
             {(() => {
               const canvasHeight = Math.max(CANVAS_HEIGHT - 40, ...displayedTables.map((t) => t.positionY + 220), 200);
               return (
@@ -319,6 +357,12 @@ export function FloorPlanPage() {
                           upcomingReservation={upcomingByTable.get(table.id) ?? null}
                         />
                       ))}
+                      {guides?.x != null && (
+                        <div className="pointer-events-none absolute top-0 bottom-0 z-20 w-px bg-accent-500/70" style={{ left: guides.x }} />
+                      )}
+                      {guides?.y != null && (
+                        <div className="pointer-events-none absolute left-0 right-0 z-20 h-px bg-accent-500/70" style={{ top: guides.y }} />
+                      )}
                     </div>
                   </div>
 
