@@ -59,7 +59,12 @@ export function FloorPlanPage() {
   const [sectionMenuOpen, setSectionMenuOpen] = useState(false);
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
 
-  const displayedTables = tables?.filter((t) => !selectedSectionId || t.sectionId === selectedSectionId) ?? [];
+  // Positions of just-dropped tables, held until their save settles — see handleDragEnd.
+  const [droppedPositions, setDroppedPositions] = useState<Record<string, { positionX: number; positionY: number }>>({});
+
+  const displayedTables = (tables ?? [])
+    .filter((t) => !selectedSectionId || t.sectionId === selectedSectionId)
+    .map((t) => (droppedPositions[t.id] ? { ...t, ...droppedPositions[t.id] } : t));
   const selectedSectionName = selectedSectionId ? sections?.find((s) => s.id === selectedSectionId)?.name : "All tables";
 
   const seatedGuestByTable = new Map(
@@ -153,9 +158,7 @@ export function FloorPlanPage() {
     // the effect above) already reconciles the cache with the confirmed position. Invalidating on
     // every drop forced an extra full refetch that could resolve after a *later* drag's optimistic
     // update, snapping that table back to its pre-drag position — the glitchy-drag bug.
-    // No onMutate either — handleDragEnd below applies the optimistic update itself, synchronously,
-    // to avoid a one-tick-late race with dnd-kit resetting its drag transform (see there). Rollback
-    // on error is handled per-call, via the closure in handleDragEnd, for the same reason.
+    // Optimistic update and rollback live in handleDragEnd instead of onMutate (see there).
   });
 
   const createTable = useMutation({
@@ -211,18 +214,28 @@ export function FloorPlanPage() {
     const nextX = Math.max(0, Math.min(CANVAS_WIDTH - 60, table.positionX + event.delta.x / scale));
     const nextY = Math.max(0, Math.min(CANVAS_HEIGHT - 60, table.positionY + event.delta.y / scale));
 
-    // dnd-kit resets its internal drag transform to null in this same synchronous event, so the
-    // table's base positionX/positionY must already reflect the drop location by the time that
-    // commits — otherwise there's one visible frame with neither the drag offset nor the new
-    // position (the released-and-it-glitches snap). useMutation's own onMutate runs a microtask
-    // later, which is one tick too late, so the cache update happens here instead, synchronously.
+    // dnd-kit drops its drag transform in this same event, so the table's base position must
+    // already be the drop location when that commits — otherwise there's one frame at the old
+    // position (the snap-back on release). setQueryData alone isn't enough: React Query notifies components on its own scheduler
+    // (setTimeout), so the re-render would still land a frame after dnd-kit's reset. Plain React
+    // state set here is batched into the same commit as dnd-kit's own state update.
+    setDroppedPositions((prev) => ({ ...prev, [table.id]: { positionX: nextX, positionY: nextY } }));
+    const clearDropped = () =>
+      setDroppedPositions((prev) => {
+        const { [table.id]: _, ...rest } = prev;
+        return rest;
+      });
+
     const previous = queryClient.getQueryData<RestaurantTable[]>(["tables"]);
     queryClient.setQueryData<RestaurantTable[]>(["tables"], (old) =>
       old?.map((t) => (t.id === table.id ? { ...t, positionX: nextX, positionY: nextY } : t))
     );
     moveTable.mutate(
       { id: table.id, positionX: nextX, positionY: nextY },
-      { onError: () => previous && queryClient.setQueryData(["tables"], previous) }
+      {
+        onError: () => previous && queryClient.setQueryData(["tables"], previous),
+        onSettled: clearDropped,
+      }
     );
   }
 
