@@ -5,6 +5,7 @@ import { AnimatePresence } from "motion/react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
 import { getSocket } from "../lib/socket";
+import { markTableSelfUpdated, wasTableSelfUpdated } from "../lib/selfUpdatedTables";
 import type { RestaurantTable, Section, SeatedSummaryEntry, TableShape } from "../lib/tables";
 import type { Reservation } from "../lib/reservations";
 import { minutesToLabel } from "../lib/reservations";
@@ -123,6 +124,10 @@ export function FloorPlanPage() {
     }
   }
 
+  // Briefly highlighted tables — a table:updated arrived for them from somewhere other than this
+  // screen's own action, so a host looking at the floor plan notices something just changed.
+  const [remoteHighlights, setRemoteHighlights] = useState<Set<string>>(new Set());
+
   // Keeps every open host-stand screen in sync — a status change made on one iPad shows up
   // on all the others without anyone refreshing.
   useEffect(() => {
@@ -138,12 +143,26 @@ export function FloorPlanPage() {
     const remove = ({ id }: { id: string }) => {
       queryClient.setQueryData<RestaurantTable[]>(["tables"], (old) => old?.filter((t) => t.id !== id));
     };
+    const remoteUpdate = (table: RestaurantTable) => {
+      upsert(table);
+      if (wasTableSelfUpdated(table.id)) return;
+      setRemoteHighlights((prev) => new Set(prev).add(table.id));
+      setTimeout(() => {
+        setRemoteHighlights((prev) => {
+          if (!prev.has(table.id)) return prev;
+          const next = new Set(prev);
+          next.delete(table.id);
+          return next;
+        });
+      }, 600);
+    };
+    // A brand-new table has nothing local to compare against — never highlight table:created.
     socket.on("table:created", upsert);
-    socket.on("table:updated", upsert);
+    socket.on("table:updated", remoteUpdate);
     socket.on("table:deleted", remove);
     return () => {
       socket.off("table:created", upsert);
-      socket.off("table:updated", upsert);
+      socket.off("table:updated", remoteUpdate);
       socket.off("table:deleted", remove);
     };
   }, [queryClient]);
@@ -244,6 +263,7 @@ export function FloorPlanPage() {
         return rest;
       });
 
+    markTableSelfUpdated(table.id);
     const previous = queryClient.getQueryData<RestaurantTable[]>(["tables"]);
     queryClient.setQueryData<RestaurantTable[]>(["tables"], (old) =>
       old?.map((t) => (t.id === table.id ? { ...t, positionX: nextX, positionY: nextY } : t))
@@ -341,6 +361,7 @@ export function FloorPlanPage() {
                           onClick={() => setStatusTable(table)}
                           seatedGuestName={seatedGuestByTable.get(table.id) ?? null}
                           upcomingReservation={upcomingByTable.get(table.id) ?? null}
+                          remoteHighlight={remoteHighlights.has(table.id)}
                         />
                       ))}
                     </div>
@@ -467,7 +488,10 @@ export function FloorPlanPage() {
             }}
             onSubmit={(data) => {
               if (formModal === "add") createTable.mutate(data);
-              else updateTable.mutate({ id: formModal.id, data });
+              else {
+                markTableSelfUpdated(formModal.id);
+                updateTable.mutate({ id: formModal.id, data });
+              }
             }}
             onDelete={
               formModal !== "add"

@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import type { RestaurantTable, TableStatus } from "../../lib/tables";
 import { ModalBackdrop, ModalPanel } from "../Modal";
+import { markTableSelfUpdated } from "../../lib/selfUpdatedTables";
 
 const STATUS_OPTIONS: { value: TableStatus; label: string; className: string }[] = [
   {
@@ -40,7 +41,10 @@ export function TableStatusPopover({ table, canEditLayout, onEditLayout, onClose
   const [notifying, setNotifying] = useState(false);
 
   const setStatus = useMutation({
-    mutationFn: (status: TableStatus) => api.patch(`/tables/${table.id}/status`, { status }),
+    mutationFn: (status: TableStatus) => {
+      markTableSelfUpdated(table.id);
+      return api.patch(`/tables/${table.id}/status`, { status });
+    },
     onSuccess: (res) => {
       queryClient.setQueryData<RestaurantTable[]>(["tables"], (old) =>
         old?.map((t) => (t.id === table.id ? res.data : t))
