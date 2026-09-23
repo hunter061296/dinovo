@@ -257,7 +257,10 @@ export function FloorPlanPage() {
                   >
                     <div
                       className="relative origin-top-left"
-                      style={{ width: CANVAS_WIDTH, height: canvasHeight, transform: `scale(${scale})` }}
+                      // will-change promotes this to its own compositing layer, so dragging a
+                      // table only repaints that table rather than the browser potentially
+                      // repainting this whole scaled canvas on every drag frame.
+                      style={{ width: CANVAS_WIDTH, height: canvasHeight, transform: `scale(${scale})`, willChange: "transform" }}
                     >
                       {displayedTables.length === 0 && (
                         <div className="flex h-full items-center justify-center text-sm text-gray-400 dark:text-gray-500">
