@@ -71,27 +71,38 @@ export async function seedDatabase(prisma: PrismaClient) {
     )
   );
 
-  // ---------- Guests (18 profiles, varied visit history/tags) ----------
+  // ---------- Guests (19 profiles, varied visit history/tags) ----------
+  // `autoTags` here mirrors what server/src/lib/guestTags.ts would compute (visitCount >= 5 =>
+  // "Regular", 60+ days since last completed visit + previously-Regular-or-visitCount >= 3 =>
+  // "Lapsing") — seeded directly since these guests aren't going through a live COMPLETED
+  // transition. `tags` stays separate/host-set, including a couple of guests manually tagged
+  // "Regular" below the auto threshold to show the two are independent.
   console.log("Seeding guests...");
   const guestDefs = [
-    { firstName: "Emma", lastName: "Johnson", phone: "555-0101", email: "emma.johnson@example.com", visitCount: 12, tags: ["VIP", "Regular"] },
-    { firstName: "Liam", lastName: "Smith", phone: "555-0102", email: "liam.smith@example.com", visitCount: 3, tags: ["Regular"] },
-    { firstName: "Olivia", lastName: "Williams", phone: "555-0103", email: "olivia.w@example.com", visitCount: 0, tags: [] },
-    { firstName: "Noah", lastName: "Brown", phone: "555-0104", email: "noah.brown@example.com", visitCount: 7, tags: ["Allergy"], notes: "Severe peanut allergy — always confirm with kitchen." },
-    { firstName: "Ava", lastName: "Jones", phone: "555-0105", email: "ava.jones@example.com", visitCount: 25, tags: ["VIP"] },
-    { firstName: "Elijah", lastName: "Garcia", phone: "555-0106", email: "elijah.g@example.com", visitCount: 1, tags: [] },
-    { firstName: "Sophia", lastName: "Miller", phone: "555-0107", email: "sophia.miller@example.com", visitCount: 4, tags: ["Regular"] },
-    { firstName: "Mason", lastName: "Davis", phone: "555-0108", email: "mason.davis@example.com", visitCount: 0, tags: [] },
-    { firstName: "Isabella", lastName: "Rodriguez", phone: "555-0109", email: "isabella.r@example.com", visitCount: 9, tags: ["Regular", "Large Party"] },
-    { firstName: "James", lastName: "Martinez", phone: "555-0110", email: "james.martinez@example.com", visitCount: 2, tags: [] },
-    { firstName: "Mia", lastName: "Hernandez", phone: "555-0111", email: "mia.h@example.com", visitCount: 15, tags: ["VIP", "Regular"] },
-    { firstName: "Benjamin", lastName: "Lopez", phone: "555-0112", email: "ben.lopez@example.com", visitCount: 5, tags: [] },
-    { firstName: "Charlotte", lastName: "Gonzalez", phone: "555-0113", email: "charlotte.g@example.com", visitCount: 0, tags: [] },
-    { firstName: "Lucas", lastName: "Wilson", phone: "555-0114", email: "lucas.wilson@example.com", visitCount: 6, tags: ["Allergy"], notes: "Gluten intolerant." },
-    { firstName: "Amelia", lastName: "Anderson", phone: "555-0115", email: "amelia.a@example.com", visitCount: 18, tags: ["VIP", "Regular"] },
-    { firstName: "Henry", lastName: "Thomas", phone: "555-0116", email: "henry.thomas@example.com", visitCount: 1, tags: [] },
-    { firstName: "Evelyn", lastName: "Taylor", phone: "555-0117", email: "evelyn.taylor@example.com", visitCount: 3, tags: ["Large Party"] },
-    { firstName: "Alexander", lastName: "Moore", phone: "555-0118", email: "alex.moore@example.com", visitCount: 0, tags: [] },
+    { firstName: "Emma", lastName: "Johnson", phone: "555-0101", email: "emma.johnson@example.com", visitCount: 12, tags: ["VIP", "Regular"], autoTags: ["Regular"], specialOccasion: "Anniversary", specialOccasionDate: "03-14" },
+    { firstName: "Liam", lastName: "Smith", phone: "555-0102", email: "liam.smith@example.com", visitCount: 3, tags: ["Regular"], autoTags: [] },
+    { firstName: "Olivia", lastName: "Williams", phone: "555-0103", email: "olivia.w@example.com", visitCount: 0, tags: [], autoTags: [] },
+    { firstName: "Noah", lastName: "Brown", phone: "555-0104", email: "noah.brown@example.com", visitCount: 7, tags: ["Allergy"], notes: "Severe peanut allergy — always confirm with kitchen.", autoTags: ["Regular"] },
+    { firstName: "Ava", lastName: "Jones", phone: "555-0105", email: "ava.jones@example.com", visitCount: 25, tags: ["VIP"], autoTags: ["Regular"] },
+    { firstName: "Elijah", lastName: "Garcia", phone: "555-0106", email: "elijah.g@example.com", visitCount: 1, tags: [], autoTags: [] },
+    { firstName: "Sophia", lastName: "Miller", phone: "555-0107", email: "sophia.miller@example.com", visitCount: 4, tags: ["Regular"], autoTags: [] },
+    { firstName: "Mason", lastName: "Davis", phone: "555-0108", email: "mason.davis@example.com", visitCount: 0, tags: [], autoTags: [] },
+    { firstName: "Isabella", lastName: "Rodriguez", phone: "555-0109", email: "isabella.r@example.com", visitCount: 9, tags: ["Regular", "Large Party"], autoTags: ["Regular"], specialOccasion: "Birthday", specialOccasionDate: "11-02" },
+    { firstName: "James", lastName: "Martinez", phone: "555-0110", email: "james.martinez@example.com", visitCount: 2, tags: [], autoTags: [] },
+    { firstName: "Mia", lastName: "Hernandez", phone: "555-0111", email: "mia.h@example.com", visitCount: 15, tags: ["VIP", "Regular"], autoTags: ["Regular"] },
+    { firstName: "Benjamin", lastName: "Lopez", phone: "555-0112", email: "ben.lopez@example.com", visitCount: 5, tags: [], autoTags: ["Regular"] },
+    { firstName: "Charlotte", lastName: "Gonzalez", phone: "555-0113", email: "charlotte.g@example.com", visitCount: 0, tags: [], autoTags: [] },
+    { firstName: "Lucas", lastName: "Wilson", phone: "555-0114", email: "lucas.wilson@example.com", visitCount: 6, tags: ["Allergy"], notes: "Gluten intolerant.", autoTags: ["Regular"] },
+    { firstName: "Amelia", lastName: "Anderson", phone: "555-0115", email: "amelia.a@example.com", visitCount: 18, tags: ["VIP", "Regular"], autoTags: ["Regular"] },
+    { firstName: "Henry", lastName: "Thomas", phone: "555-0116", email: "henry.thomas@example.com", visitCount: 1, tags: [], autoTags: [] },
+    { firstName: "Evelyn", lastName: "Taylor", phone: "555-0117", email: "evelyn.taylor@example.com", visitCount: 3, tags: ["Large Party"], autoTags: [] },
+    { firstName: "Alexander", lastName: "Moore", phone: "555-0118", email: "alex.moore@example.com", visitCount: 0, tags: [], autoTags: [] },
+    // visitCount 4 is below the Regular threshold but above LAPSING_MIN_VISITS, and their last
+    // completed visit (seeded separately below) is 75 days ago — demonstrates "Lapsing" on its own.
+    { firstName: "Grace", lastName: "Lee", phone: "555-0119", email: "grace.lee@example.com", visitCount: 4, tags: [], autoTags: ["Lapsing"] },
+    // noShowCount 2 meets FREQUENT_NO_SHOW_THRESHOLD (see server/src/lib/guestTags.ts) — two
+    // matching NO_SHOW reservations are seeded separately below.
+    { firstName: "Oscar", lastName: "Ruiz", phone: "555-0120", email: "oscar.ruiz@example.com", visitCount: 3, tags: [], autoTags: ["Frequent no-show"], noShowCount: 2 },
   ];
   const guests = await Promise.all(guestDefs.map((g) => prisma.guest.create({ data: g })));
 
@@ -179,6 +190,39 @@ export async function seedDatabase(prisma: PrismaClient) {
       });
     })
   );
+
+  // An old completed visit for the "Lapsing" demo guest (Grace Lee) — dated well past the
+  // 60-day threshold, separate from the "today" reservations above.
+  const lapsingGuest = guests.find((g) => g.email === "grace.lee@example.com")!;
+  const lapsingVisitTime = new Date(today.getTime() - 75 * 24 * 60 * 60 * 1000 + mins(19) * 60_000);
+  const lapsingSeatedAt = new Date(lapsingVisitTime.getTime() + 5 * 60_000);
+  await prisma.reservation.create({
+    data: {
+      guestId: lapsingGuest.id,
+      partySize: 2,
+      dateTime: lapsingVisitTime,
+      status: "COMPLETED",
+      tableId: null,
+      shiftId: dinner.id,
+      createdById: host.id,
+      seatedAt: lapsingSeatedAt,
+      completedAt: new Date(lapsingSeatedAt.getTime() + 50 * 60_000),
+    },
+  });
+
+  // Two past no-shows for the "Frequent no-show" demo guest (Oscar Ruiz).
+  const noShowGuest = guests.find((g) => g.email === "oscar.ruiz@example.com")!;
+  await prisma.reservation.createMany({
+    data: [20, 40].map((daysAgo) => ({
+      guestId: noShowGuest.id,
+      partySize: 2,
+      dateTime: new Date(today.getTime() - daysAgo * 24 * 60 * 60 * 1000 + mins(19) * 60_000),
+      status: "NO_SHOW" as ReservationStatus,
+      tableId: null,
+      shiftId: dinner.id,
+      createdById: host.id,
+    })),
+  });
 
   // ---------- Waitlist (a couple of active walk-ins) ----------
   console.log("Seeding waitlist...");

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence } from "motion/react";
 import { api } from "../../lib/api";
 import { formatElapsed } from "../../lib/elapsed";
 import type { SeatedSummaryEntry } from "../../lib/tables";
@@ -173,28 +174,32 @@ export function FloorPlanSidePanel() {
           </ul>
         ))}
 
-      {seatingReservation && (
-        <SeatTableModal
-          title={`${seatingReservation.guest.firstName} ${seatingReservation.guest.lastName}`}
-          subtitle={`Party of ${seatingReservation.partySize} · choose an open table.`}
-          partySize={seatingReservation.partySize}
-          preferredTableId={seatingReservation.tableId}
-          submitting={seatReservation.isPending}
-          onClose={() => setSeatingReservation(null)}
-          onSeat={(tableId) => seatReservation.mutate({ id: seatingReservation.id, tableId })}
-        />
-      )}
+      <AnimatePresence>
+        {seatingReservation && (
+          <SeatTableModal
+            key="seat-reservation"
+            title={`${seatingReservation.guest.firstName} ${seatingReservation.guest.lastName}`}
+            subtitle={`Party of ${seatingReservation.partySize} · choose an open table.`}
+            partySize={seatingReservation.partySize}
+            preferredTableId={seatingReservation.tableId}
+            submitting={seatReservation.isPending}
+            onClose={() => setSeatingReservation(null)}
+            onSeat={(tableId) => seatReservation.mutate({ id: seatingReservation.id, tableId })}
+          />
+        )}
 
-      {seatingWaitlistEntry && (
-        <SeatTableModal
-          title={seatingWaitlistEntry.guestName}
-          subtitle={`Party of ${seatingWaitlistEntry.partySize} · choose an open table.`}
-          partySize={seatingWaitlistEntry.partySize}
-          submitting={seatWaitlistEntry.isPending}
-          onClose={() => setSeatingWaitlistEntry(null)}
-          onSeat={(tableId) => seatWaitlistEntry.mutate({ id: seatingWaitlistEntry.id, tableId })}
-        />
-      )}
+        {seatingWaitlistEntry && (
+          <SeatTableModal
+            key="seat-waitlist"
+            title={seatingWaitlistEntry.guestName}
+            subtitle={`Party of ${seatingWaitlistEntry.partySize} · choose an open table.`}
+            partySize={seatingWaitlistEntry.partySize}
+            submitting={seatWaitlistEntry.isPending}
+            onClose={() => setSeatingWaitlistEntry(null)}
+            onSeat={(tableId) => seatWaitlistEntry.mutate({ id: seatingWaitlistEntry.id, tableId })}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence } from "motion/react";
 import { api } from "../lib/api";
 import { getSocket } from "../lib/socket";
 import { minutesSince, type WaitlistEntry } from "../lib/waitlist";
@@ -155,16 +156,19 @@ export function WaitlistPage() {
         </div>
       )}
 
-      {seating && (
-        <SeatTableModal
-          title={seating.guestName}
-          subtitle={`Party of ${seating.partySize} · choose an open table.`}
-          partySize={seating.partySize}
-          submitting={seatEntry.isPending}
-          onClose={() => setSeating(null)}
-          onSeat={(tableId) => seatEntry.mutate({ id: seating.id, tableId })}
-        />
-      )}
+      <AnimatePresence>
+        {seating && (
+          <SeatTableModal
+            key="seat-table"
+            title={seating.guestName}
+            subtitle={`Party of ${seating.partySize} · choose an open table.`}
+            partySize={seating.partySize}
+            submitting={seatEntry.isPending}
+            onClose={() => setSeating(null)}
+            onSeat={(tableId) => seatEntry.mutate({ id: seating.id, tableId })}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

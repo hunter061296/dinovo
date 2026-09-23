@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { AnimatePresence } from "motion/react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
 import { getSocket } from "../lib/socket";
@@ -160,7 +161,10 @@ export function FloorPlanPage() {
     onError: (_err, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(["tables"], context.previous);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["tables"] }),
+    // No onSettled invalidate here: the server's own "table:updated" socket broadcast (handled by
+    // the effect above) already reconciles the cache with the confirmed position. Invalidating on
+    // every drop forced an extra full refetch that could resolve after a *later* drag's optimistic
+    // update, snapping that table back to its pre-drag position — the glitchy-drag bug.
   });
 
   const createTable = useMutation({
@@ -372,45 +376,49 @@ export function FloorPlanPage() {
 
       )}
 
-      {statusTable && (
-        <TableStatusPopover
-          table={tables?.find((t) => t.id === statusTable.id) ?? statusTable}
-          canEditLayout={canEdit}
-          onEditLayout={() => {
-            setFormModal(statusTable);
-            setStatusTable(null);
-          }}
-          onClose={() => setStatusTable(null)}
-        />
-      )}
+      <AnimatePresence>
+        {statusTable && (
+          <TableStatusPopover
+            key="status-popover"
+            table={tables?.find((t) => t.id === statusTable.id) ?? statusTable}
+            canEditLayout={canEdit}
+            onEditLayout={() => {
+              setFormModal(statusTable);
+              setStatusTable(null);
+            }}
+            onClose={() => setStatusTable(null)}
+          />
+        )}
 
-      {formModal && (
-        <TableFormModal
-          initial={formModal === "add" ? undefined : formModal}
-          sections={sections ?? []}
-          submitting={createTable.isPending || updateTable.isPending}
-          error={formError}
-          onClose={() => {
-            setFormModal(null);
-            setFormError(null);
-          }}
-          onSubmit={(data) => {
-            if (formModal === "add") createTable.mutate(data);
-            else updateTable.mutate({ id: formModal.id, data });
-          }}
-          onDelete={
-            formModal !== "add"
-              ? () => {
-                  if (confirm(`Delete table ${formModal.number}? This cannot be undone.`)) {
-                    deleteTable.mutate(formModal.id);
+        {formModal && (
+          <TableFormModal
+            key="table-form"
+            initial={formModal === "add" ? undefined : formModal}
+            sections={sections ?? []}
+            submitting={createTable.isPending || updateTable.isPending}
+            error={formError}
+            onClose={() => {
+              setFormModal(null);
+              setFormError(null);
+            }}
+            onSubmit={(data) => {
+              if (formModal === "add") createTable.mutate(data);
+              else updateTable.mutate({ id: formModal.id, data });
+            }}
+            onDelete={
+              formModal !== "add"
+                ? () => {
+                    if (confirm(`Delete table ${formModal.number}? This cannot be undone.`)) {
+                      deleteTable.mutate(formModal.id);
+                    }
                   }
-                }
-              : undefined
-          }
-        />
-      )}
+                : undefined
+            }
+          />
+        )}
 
-      {sectionManagerOpen && <SectionManagerModal sections={sections ?? []} onClose={() => setSectionManagerOpen(false)} />}
+        {sectionManagerOpen && <SectionManagerModal key="section-manager" sections={sections ?? []} onClose={() => setSectionManagerOpen(false)} />}
+      </AnimatePresence>
     </div>
   );
 }

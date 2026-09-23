@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import type { RestaurantTable, TableStatus } from "../../lib/tables";
+import { ModalBackdrop, ModalPanel } from "../Modal";
 
 const STATUS_OPTIONS: { value: TableStatus; label: string; className: string }[] = [
   {
@@ -59,8 +60,8 @@ export function TableStatusPopover({ table, canEditLayout, onEditLayout, onClose
   }
 
   return (
-    <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
-      <div className="w-full max-w-xs rounded-lg bg-white p-4 shadow-lg dark:bg-gray-800" onClick={(e) => e.stopPropagation()}>
+    <ModalBackdrop onClick={onClose}>
+      <ModalPanel className="w-full max-w-xs rounded-lg bg-white p-4 shadow-lg dark:bg-gray-800" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Table {table.number}</h2>
           <span className="text-xs text-gray-500 dark:text-gray-400">{table.capacity} seats</span>
@@ -112,7 +113,7 @@ export function TableStatusPopover({ table, canEditLayout, onEditLayout, onClose
             Close
           </button>
         </div>
-      </div>
-    </div>
+      </ModalPanel>
+    </ModalBackdrop>
   );
 }

@@ -47,6 +47,15 @@ export function TableCard({ table, draggable, onClick, scale = 1, seatedGuestNam
     height,
     transform: CSS.Translate.toString(adjustedTransform),
     zIndex: isDragging ? 10 : 1,
+    // Required by dnd-kit's PointerSensor: without it, the browser's own touch/pointer gesture
+    // handling fights the drag on every move, which is what caused both the jittery dragging and
+    // the cursor sometimes vanishing mid-drag.
+    touchAction: draggable ? "none" : undefined,
+    willChange: isDragging ? "transform" : undefined,
+    // Driven from JS state rather than a Tailwind `active:` class — once pointer capture takes
+    // over during a drag, `:active` stops reliably matching in some browsers, which is the other
+    // half of the disappearing-cursor bug.
+    cursor: draggable ? (isDragging ? "grabbing" : "grab") : "pointer",
   };
 
   const showsReservationBadge = table.status === "OPEN" && !!upcomingReservation;
@@ -59,9 +68,7 @@ export function TableCard({ table, draggable, onClick, scale = 1, seatedGuestNam
       onClick={onClick}
       className={`flex flex-col items-center justify-center border-2 px-1 text-sm font-medium shadow-sm transition-shadow hover:shadow-md ${
         table.shape === "ROUND" ? "rounded-full" : "rounded-lg"
-      } ${STATUS_STYLES[table.status]} ${draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${
-        showsReservationBadge ? "ring-2 ring-amber-400 dark:ring-amber-500" : ""
-      }`}
+      } ${STATUS_STYLES[table.status]} ${showsReservationBadge ? "ring-2 ring-amber-400 dark:ring-amber-500" : ""}`}
       {...(draggable ? { ...listeners, ...attributes } : {})}
     >
       <span className="font-semibold">#{table.number}</span>

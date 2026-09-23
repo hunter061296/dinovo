@@ -66,8 +66,9 @@ whether a message actually went out rather than just trusting a button click.
   cramped.
 - **Reservation book (Phase 4)**: table assignment is a plain dropdown, not
   drag-and-drop onto the floor plan (that interaction lives on the Floor Plan
-  page instead, for table *status*). No warning if the same table is assigned
-  to two overlapping reservations.
+  page instead, for table *status*). Assigning the same table to two
+  overlapping reservations is server-enforced (409, see Pacing note below) —
+  not just a client warning.
 - **Live status (Phase 5)**: fully manual — see the POS note above. No
   visible "reconnecting..." indicator if the Socket.io connection drops
   (it reconnects automatically, but silently).
@@ -78,10 +79,25 @@ whether a message actually went out rather than just trusting a button click.
 - **Guestbook (Phase 7)**: no merge/dedup tooling if the same person ends up
   with two profiles (e.g. booked once by phone, once by email with a typo).
   No guest deletion. The "browse all" list is capped at 100 with no
-  pagination.
+  pagination. Auto-tags (`Guest.autoTags`, recomputed in `server/src/lib/
+  guestTags.ts` after a reservation's status changes to COMPLETED/NO_SHOW)
+  use fixed thresholds, easy to tune in one place: **5** completed visits for
+  "Regular", **60** days since the last completed visit (and previously
+  Regular or 3+ visits) for "Lapsing", **2** no-shows for "Frequent no-show".
 - **Pacing (Phase 8)**: slots are fixed at 30 minutes (no 15-minute option),
   and there's no bulk-fill — each slot's cap is set individually, which is
-  tedious for configuring a whole shift from scratch.
+  tedious for configuring a whole shift from scratch. The `maxCovers`/
+  `maxPartySize` cap check is enforced server-side (`server/src/lib/
+  pacing.ts`, called from `POST`/`PATCH /api/reservations`), not just in the
+  client — it stays a soft warning (`overCap`/`capDetail` on the response),
+  matching the client's existing amber-warning UX, since pacing is guidance
+  a host can knowingly override, not a physical constraint. Double-booking a
+  table is a physical constraint instead, so that check (`server/src/lib/
+  tableAvailability.ts`) is a hard 409 block; it uses a flat 90-minute
+  occupancy window around a reservation's `dateTime` rather than a real
+  per-table turn-time setting, since none exists yet (`Reservation.
+  seatedAt`/`completedAt` could inform a real one — see the turn-time note
+  under Reports below).
 - **Reports (Phase 9)**: average turn time is computed from a
   reservation's own `seatedAt`/`completedAt` timestamps, since there's no
   full table-status audit log to derive it from directly — accurate only as

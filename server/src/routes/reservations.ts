@@ -4,6 +4,9 @@ import { ReservationStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { findShiftForDateTime } from "../lib/shiftMatch";
+import { checkPacingCap } from "../lib/pacing";
+import { findConflictingReservation, conflictMessage } from "../lib/tableAvailability";
+import { recomputeAutoTags } from "../lib/guestTags";
 import { getIO } from "../lib/socket";
 
 const router = Router();
@@ -55,6 +58,13 @@ router.post("/", async (req, res) => {
   }
   const { partySize, dateTime, tableId, notes } = parsed.data;
 
+  if (tableId) {
+    const conflict = await findConflictingReservation({ tableId, dateTime });
+    if (conflict) {
+      return res.status(409).json({ error: conflictMessage(conflict) });
+    }
+  }
+
   let guestId = parsed.data.guestId;
   if (!guestId && parsed.data.newGuest) {
     const g = parsed.data.newGuest;
@@ -78,7 +88,12 @@ router.post("/", async (req, res) => {
     },
     include,
   });
-  res.status(201).json(reservation);
+
+  const cap = await checkPacingCap({ dateTime, partySize, shiftId: shift?.id });
+  if (cap.overCap) {
+    console.warn(`[pacing] reservation ${reservation.id} exceeds cap: ${cap.capDetail}`);
+  }
+  res.status(201).json({ ...reservation, overCap: cap.overCap, capDetail: cap.capDetail });
 });
 
 const updateReservationSchema = z.object({
@@ -100,6 +115,22 @@ router.patch("/:id", async (req, res) => {
     return res.status(404).json({ error: "Reservation not found" });
   }
 
+  // A table can't literally seat two parties at once, so this blocks the save (unlike the
+  // pacing cap above, which only warns). Runs whenever the table being assigned is changing, or
+  // an already-assigned table's time is moving, since either can newly collide with another
+  // reservation on that table.
+  const effectiveTableId = parsed.data.tableId !== undefined ? parsed.data.tableId : existing.tableId;
+  if (effectiveTableId && (parsed.data.tableId !== undefined || parsed.data.dateTime !== undefined)) {
+    const conflict = await findConflictingReservation({
+      tableId: effectiveTableId,
+      dateTime: parsed.data.dateTime ?? existing.dateTime,
+      excludeId: existing.id,
+    });
+    if (conflict) {
+      return res.status(409).json({ error: conflictMessage(conflict) });
+    }
+  }
+
   const data: Record<string, unknown> = { ...parsed.data };
 
   // Re-resolve the shift whenever the time changes, so pacing/reporting stay accurate.
@@ -112,6 +143,19 @@ router.patch("/:id", async (req, res) => {
   }
   if (parsed.data.status === "COMPLETED" || parsed.data.status === "NO_SHOW" || parsed.data.status === "CANCELLED") {
     data.completedAt = new Date();
+  }
+
+  let cap: { overCap: boolean; capDetail: string | null } = { overCap: false, capDetail: null };
+  if (parsed.data.partySize !== undefined || parsed.data.dateTime !== undefined || parsed.data.status !== undefined) {
+    cap = await checkPacingCap({
+      dateTime: parsed.data.dateTime ?? existing.dateTime,
+      partySize: parsed.data.partySize ?? existing.partySize,
+      shiftId: parsed.data.dateTime ? (data.shiftId as string | null) : existing.shiftId,
+      excludeId: existing.id,
+    });
+    if (cap.overCap) {
+      console.warn(`[pacing] reservation ${existing.id} update exceeds cap: ${cap.capDetail}`);
+    }
   }
 
   try {
@@ -127,6 +171,16 @@ router.patch("/:id", async (req, res) => {
         where: { id: reservation.guestId },
         data: { visitCount: { increment: 1 } },
       });
+      await recomputeAutoTags(reservation.guestId);
+    }
+    // Same pattern as visitCount above: increment only on the transition into NO_SHOW so
+    // re-saving an already-no-show reservation can't double-count.
+    if (parsed.data.status === "NO_SHOW" && existing.status !== "NO_SHOW") {
+      await prisma.guest.update({
+        where: { id: reservation.guestId },
+        data: { noShowCount: { increment: 1 } },
+      });
+      await recomputeAutoTags(reservation.guestId);
     }
 
     // Keep the floor plan in sync with the reservation book: seating a reservation occupies its
@@ -148,7 +202,7 @@ router.patch("/:id", async (req, res) => {
       }
     }
 
-    res.json(reservation);
+    res.json({ ...reservation, overCap: cap.overCap, capDetail: cap.capDetail });
   } catch {
     res.status(404).json({ error: "Reservation not found" });
   }

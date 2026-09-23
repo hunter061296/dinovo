@@ -9,11 +9,27 @@ export interface Guest {
   phone: string | null;
   email: string | null;
   visitCount: number;
+  noShowCount: number;
   tags: string[];
+  // System-inferred tags (e.g. "Regular", "Lapsing") — kept separate from the host-editable
+  // `tags` above; see server/src/lib/guestTags.ts. Merge for display, don't conflate the two.
+  autoTags: string[];
   notes: string | null;
+  // Short label (e.g. "Anniversary") + "MM-DD" date, no year — see server/prisma/schema.prisma.
+  specialOccasion: string | null;
+  specialOccasionDate: string | null;
   // Present on search/list results (most recent reservation only) — absent when a Guest comes
   // embedded in a Reservation, since that reservation already implies at least one visit.
   reservations?: { dateTime: string; status: ReservationStatus }[];
+}
+
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// Formats a "MM-DD" special-occasion date as e.g. "Mar 14".
+export function formatOccasionDate(mmdd: string): string {
+  const [month, day] = mmdd.split("-").map(Number);
+  const label = MONTH_LABELS[month - 1];
+  return label ? `${label} ${day}` : mmdd;
 }
 
 export interface PacingRule {

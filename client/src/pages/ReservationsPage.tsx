@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence } from "motion/react";
 import { api } from "../lib/api";
 import type { Shift } from "../lib/reservations";
 import { STATUS_LABELS, STATUS_STYLES, minutesToLabel } from "../lib/reservations";
@@ -161,35 +162,39 @@ export function ReservationsPage() {
         </div>
       )}
 
-      {modal === "add" && (
-        <ReservationWizardModal
-          initialDate={date}
-          submitting={createReservation.isPending}
-          error={formError}
-          onClose={() => {
-            setModal(null);
-            setFormError(null);
-          }}
-          onSubmit={(values) => createReservation.mutate(values)}
-        />
-      )}
+      <AnimatePresence>
+        {modal === "add" && (
+          <ReservationWizardModal
+            key="wizard"
+            initialDate={date}
+            submitting={createReservation.isPending}
+            error={formError}
+            onClose={() => {
+              setModal(null);
+              setFormError(null);
+            }}
+            onSubmit={(values) => createReservation.mutate(values)}
+          />
+        )}
 
-      {modal && modal !== "add" && (
-        <ReservationFormModal
-          date={date}
-          shifts={shifts ?? []}
-          reservationsThatDay={reservations ?? []}
-          initial={modal}
-          submitting={updateReservation.isPending}
-          error={formError}
-          onClose={() => {
-            setModal(null);
-            setFormError(null);
-          }}
-          onSubmit={(values) => updateReservation.mutate({ id: modal.id, values })}
-          onCancelReservation={() => updateReservation.mutate({ id: modal.id, values: { status: "CANCELLED" } })}
-        />
-      )}
+        {modal && modal !== "add" && (
+          <ReservationFormModal
+            key="edit-form"
+            date={date}
+            shifts={shifts ?? []}
+            reservationsThatDay={reservations ?? []}
+            initial={modal}
+            submitting={updateReservation.isPending}
+            error={formError}
+            onClose={() => {
+              setModal(null);
+              setFormError(null);
+            }}
+            onSubmit={(values) => updateReservation.mutate({ id: modal.id, values })}
+            onCancelReservation={() => updateReservation.mutate({ id: modal.id, values: { status: "CANCELLED" } })}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
