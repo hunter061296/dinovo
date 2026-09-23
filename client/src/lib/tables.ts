@@ -13,6 +13,13 @@ export interface RestaurantTable {
   sectionId: string | null;
 }
 
+// Rendered size of a table on the floor plan canvas, in unscaled canvas pixels.
+export function tableSize(capacity: number, shape: TableShape) {
+  const base = Math.min(56 + capacity * 4, 140);
+  if (shape === "RECTANGLE") return { width: base * 1.6, height: base * 0.8 };
+  return { width: base, height: base };
+}
+
 export interface Section {
   id: string;
   name: string;

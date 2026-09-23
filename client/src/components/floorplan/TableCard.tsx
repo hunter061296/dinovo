@@ -1,6 +1,6 @@
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import type { RestaurantTable } from "../../lib/tables";
+import { tableSize, type RestaurantTable } from "../../lib/tables";
 
 const STATUS_STYLES: Record<RestaurantTable["status"], string> = {
   OPEN: "bg-white border-gray-300 text-gray-700 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200",
@@ -8,12 +8,6 @@ const STATUS_STYLES: Record<RestaurantTable["status"], string> = {
   ORDERED: "bg-amber-100 border-amber-400 text-amber-800 dark:bg-amber-900/40 dark:border-amber-600 dark:text-amber-300",
   NEEDS_CLEANING: "bg-red-100 border-red-400 text-red-800 dark:bg-red-900/40 dark:border-red-600 dark:text-red-300",
 };
-
-function sizeFor(capacity: number, shape: RestaurantTable["shape"]) {
-  const base = Math.min(56 + capacity * 4, 140);
-  if (shape === "RECTANGLE") return { width: base * 1.6, height: base * 0.8 };
-  return { width: base, height: base };
-}
 
 interface Props {
   table: RestaurantTable;
@@ -35,7 +29,7 @@ export function TableCard({ table, draggable, onClick, scale = 1, seatedGuestNam
     id: table.id,
     disabled: !draggable,
   });
-  const { width, height } = sizeFor(table.capacity, table.shape);
+  const { width, height } = tableSize(table.capacity, table.shape);
 
   const adjustedTransform = transform && scale !== 1 ? { ...transform, x: transform.x / scale, y: transform.y / scale } : transform;
 
