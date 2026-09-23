@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AnimatePresence } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { api } from "../lib/api";
 import type { Shift } from "../lib/reservations";
 import { STATUS_LABELS, STATUS_STYLES, minutesToLabel } from "../lib/reservations";
@@ -8,6 +8,8 @@ import type { Reservation } from "../lib/reservations";
 import { coversInSlot, findPacingRule } from "../lib/pacing";
 import { ReservationFormModal, type ReservationFormValues } from "../components/reservations/ReservationFormModal";
 import { ReservationWizardModal } from "../components/reservations/ReservationWizardModal";
+import { DURATION, useMotionDuration } from "../lib/motion";
+import { listChipVariants } from "../lib/listMotion";
 
 const SLOT_MINUTES = 30;
 
@@ -21,6 +23,7 @@ export function ReservationsPage() {
   const [date, setDate] = useState(todayLocalISODate());
   const [modal, setModal] = useState<"add" | Reservation | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const chipDuration = useMotionDuration(DURATION.fast);
 
   const {
     data: shifts,
@@ -140,20 +143,28 @@ export function ReservationsPage() {
                   {items.length === 0 ? (
                     <span className="py-1.5 text-xs text-gray-300 dark:text-gray-600">—</span>
                   ) : (
-                    items.map((r) => (
-                      <button
-                        key={r.id}
-                        onClick={() => setModal(r)}
-                        className={`rounded-md border px-3 py-1.5 text-left text-xs shadow-sm hover:shadow ${STATUS_STYLES[r.status]}`}
-                      >
-                        <div className="font-semibold">
-                          {r.guest.firstName} {r.guest.lastName} · {r.partySize}
-                        </div>
-                        <div className="opacity-75">
-                          {r.table ? `Table ${r.table.number}` : "Unassigned"} · {STATUS_LABELS[r.status]}
-                        </div>
-                      </button>
-                    ))
+                    <AnimatePresence mode="popLayout" initial={false}>
+                      {items.map((r) => (
+                        <motion.button
+                          key={r.id}
+                          layout
+                          variants={listChipVariants}
+                          initial="initial"
+                          animate="animate"
+                          exit="exit"
+                          transition={{ duration: chipDuration, ease: "easeInOut" }}
+                          onClick={() => setModal(r)}
+                          className={`rounded-md border px-3 py-1.5 text-left text-xs shadow-sm hover:shadow ${STATUS_STYLES[r.status]}`}
+                        >
+                          <div className="font-semibold">
+                            {r.guest.firstName} {r.guest.lastName} · {r.partySize}
+                          </div>
+                          <div className="opacity-75">
+                            {r.table ? `Table ${r.table.number}` : "Unassigned"} · {STATUS_LABELS[r.status]}
+                          </div>
+                        </motion.button>
+                      ))}
+                    </AnimatePresence>
                   )}
                 </div>
               </div>

@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import { AnimatePresence, motion } from "motion/react";
 import { api } from "../lib/api";
 import type { Guest } from "../lib/reservations";
 import { TagBadge } from "../components/TagBadge";
+import { DURATION, useMotionDuration } from "../lib/motion";
+import { listRowVariants } from "../lib/listMotion";
 
 export function GuestbookPage() {
   const [search, setSearch] = useState("");
@@ -18,6 +21,7 @@ export function GuestbookPage() {
     queryKey: ["guests", "list", debounced],
     queryFn: () => api.get("/guests", { params: debounced ? { search: debounced } : {} }).then((res) => res.data),
   });
+  const rowDuration = useMotionDuration(DURATION.fast);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
@@ -42,26 +46,37 @@ export function GuestbookPage() {
             <div className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">No guests found.</div>
           ) : (
             <ul className="divide-y divide-gray-100 dark:divide-gray-700">
-              {guests.map((g) => (
-                <li key={g.id}>
-                  <Link to={`/guests/${g.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <div>
-                      <div className="font-medium text-gray-900 dark:text-gray-100">
-                        {g.firstName} {g.lastName}
+              <AnimatePresence mode="popLayout" initial={false}>
+                {guests.map((g) => (
+                  <motion.li
+                    key={g.id}
+                    layout
+                    variants={listRowVariants}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    transition={{ duration: rowDuration, ease: "easeInOut" }}
+                    className="overflow-hidden"
+                  >
+                    <Link to={`/guests/${g.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <div>
+                        <div className="font-medium text-gray-900 dark:text-gray-100">
+                          {g.firstName} {g.lastName}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{g.phone || g.email || "No contact info"}</div>
                       </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">{g.phone || g.email || "No contact info"}</div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {[...g.tags.map((tag) => ({ tag, auto: false })), ...g.autoTags.map((tag) => ({ tag, auto: true }))]
-                        .slice(0, 3)
-                        .map(({ tag, auto }) => (
-                          <TagBadge key={`${auto ? "auto" : "manual"}-${tag}`} tag={tag} auto={auto} />
-                        ))}
-                      <span className="text-xs text-gray-400 dark:text-gray-500">{g.visitCount} visits</span>
-                    </div>
-                  </Link>
-                </li>
-              ))}
+                      <div className="flex items-center gap-2">
+                        {[...g.tags.map((tag) => ({ tag, auto: false })), ...g.autoTags.map((tag) => ({ tag, auto: true }))]
+                          .slice(0, 3)
+                          .map(({ tag, auto }) => (
+                            <TagBadge key={`${auto ? "auto" : "manual"}-${tag}`} tag={tag} auto={auto} />
+                          ))}
+                        <span className="text-xs text-gray-400 dark:text-gray-500">{g.visitCount} visits</span>
+                      </div>
+                    </Link>
+                  </motion.li>
+                ))}
+              </AnimatePresence>
             </ul>
           )}
         </div>
