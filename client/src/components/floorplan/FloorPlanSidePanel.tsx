@@ -43,16 +43,37 @@ function sortReservations(list: Reservation[], sortBy: SortKey): Reservation[] {
   }
 }
 
+function matchesSearch(query: string, ...fields: (string | null | undefined)[]) {
+  if (!query) return true;
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return fields.some((f) => f?.toLowerCase().includes(q));
+}
+
+// Small tablet/floor-plan glyph for the row-level "assign a table" action, distinct from tapping
+// the guest's name (which opens their reservation detail instead).
+function AssignTableIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+      <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm0 1.5h12a.5.5 0 01.5.5v8a.5.5 0 01-.5.5H4a.5.5 0 01-.5-.5V6a.5.5 0 01.5-.5zM6 8a1 1 0 000 2h8a1 1 0 100-2H6zm0 3a1 1 0 100 2h4a1 1 0 100-2H6z" clipRule="evenodd" />
+    </svg>
+  );
+}
+
 interface Props {
   // The day being browsed on the Floor Plan (its date switcher) — the Upcoming list is scoped to
   // this date, but Seated/Waitlist stay live/"now" regardless, since floor and waitlist state has
   // no historical record to browse.
   date: string;
+  // Opens the full reservation detail panel (tags, notes, guest stats, etc.) — clicking a guest's
+  // name is a separate action from the row's "assign a table" icon.
+  onOpenReservation: (r: Reservation) => void;
 }
 
-export function FloorPlanSidePanel({ date }: Props) {
+export function FloorPlanSidePanel({ date, onOpenReservation }: Props) {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>("upcoming");
+  const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortKey>("time");
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const sortMenuRef = useRef<HTMLDivElement>(null);
@@ -99,9 +120,15 @@ export function FloorPlanSidePanel({ date }: Props) {
   // already passed — a late arrival still needs seating, so it stays in this list rather than
   // dropping off.
   const upcoming = sortReservations(
-    (reservations ?? []).filter((r) => r.status === "BOOKED"),
+    (reservations ?? []).filter(
+      (r) =>
+        r.status === "BOOKED" &&
+        matchesSearch(search, r.guest.firstName, r.guest.lastName, `${r.guest.firstName} ${r.guest.lastName}`, r.guest.phone)
+    ),
     sortBy
   );
+  const filteredSeated = (seatedSummary ?? []).filter((e) => matchesSearch(search, e.guestName));
+  const filteredWaitlist = (waitlist ?? []).filter((e) => matchesSearch(search, e.guestName, e.phone));
 
   const invalidateAfterSeating = () => {
     queryClient.invalidateQueries({ queryKey: ["reservations", date] });
@@ -119,6 +146,16 @@ export function FloorPlanSidePanel({ date }: Props) {
     },
   });
 
+  // Assigns a table ahead of time without seating — the reservation stays BOOKED. The server's
+  // own conflict check still blocks assigning a table that's genuinely double-booked.
+  const preAssignReservation = useMutation({
+    mutationFn: ({ id, tableId }: { id: string; tableId: string }) => api.patch(`/reservations/${id}`, { tableId }),
+    onSuccess: () => {
+      invalidateAfterSeating();
+      setSeatingReservation(null);
+    },
+  });
+
   const seatWaitlistEntry = useMutation({
     mutationFn: ({ id, tableId }: { id: string; tableId: string }) => api.post(`/waitlist/${id}/seat`, { tableId }),
     onSuccess: () => {
@@ -129,12 +166,35 @@ export function FloorPlanSidePanel({ date }: Props) {
 
   const tabs: { key: Tab; label: string; count: number }[] = [
     { key: "upcoming", label: "Upcoming", count: upcoming.length },
-    { key: "seated", label: "Seated", count: seatedSummary?.length ?? 0 },
-    { key: "waitlist", label: "Waitlist", count: waitlist?.length ?? 0 },
+    { key: "seated", label: "Seated", count: filteredSeated.length },
+    { key: "waitlist", label: "Waitlist", count: filteredWaitlist.length },
   ];
 
   return (
     <div className="w-full shrink-0 rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 sm:w-72">
+      <div className="border-b border-gray-100 p-2 dark:border-gray-700">
+        <div className="relative">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+          >
+            <path
+              fillRule="evenodd"
+              d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z"
+              clipRule="evenodd"
+            />
+          </svg>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or phone"
+            className="w-full rounded-md border border-gray-300 py-1.5 pl-8 pr-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+          />
+        </div>
+      </div>
+
       <div className="flex border-b border-gray-100 dark:border-gray-700">
         {tabs.map((t) => (
           <button
@@ -198,14 +258,15 @@ export function FloorPlanSidePanel({ date }: Props) {
 
           {upcoming.length === 0 ? (
             <p className="p-3 text-xs text-gray-400 dark:text-gray-500">
-              {isToday ? "Nothing else booked for today." : "Nothing booked for this date."}
+              {search ? "No matching reservations." : isToday ? "Nothing else booked for today." : "Nothing booked for this date."}
             </p>
           ) : (
             <ul className="max-h-[26rem] divide-y divide-gray-100 overflow-y-auto dark:divide-gray-700">
               {upcoming.map((r) => (
                 <li key={r.id} className="px-3 py-2.5 text-sm">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
+                    {/* Opens the full reservation detail panel. */}
+                    <button onClick={() => onOpenReservation(r)} className="min-w-0 flex-1 text-left hover:underline">
                       <div className="truncate font-medium text-gray-900 dark:text-gray-100">
                         {r.guest.firstName} {r.guest.lastName} · {r.partySize}
                       </div>
@@ -213,14 +274,16 @@ export function FloorPlanSidePanel({ date }: Props) {
                         {minutesToLabel(new Date(r.dateTime).getHours() * 60 + new Date(r.dateTime).getMinutes())} ·{" "}
                         {r.table ? `Table ${r.table.number}` : "Unassigned"}
                       </div>
-                    </div>
-                    {/* Seating only makes sense for a party that could be here right now. */}
+                    </button>
+                    {/* Assign/seat a table — a separate action from opening the reservation above. */}
                     {isToday && (
                       <button
                         onClick={() => setSeatingReservation(r)}
-                        className="shrink-0 rounded-md bg-accent-600 px-2 py-1 text-xs font-medium text-white hover:bg-accent-700"
+                        aria-label={`Assign a table for ${r.guest.firstName} ${r.guest.lastName}`}
+                        title="Assign a table"
+                        className="shrink-0 rounded-md bg-accent-600 p-1.5 text-white hover:bg-accent-700"
                       >
-                        Seat
+                        <AssignTableIcon />
                       </button>
                     )}
                   </div>
@@ -232,11 +295,11 @@ export function FloorPlanSidePanel({ date }: Props) {
       )}
 
       {tab === "seated" &&
-        (!seatedSummary || seatedSummary.length === 0 ? (
-          <p className="p-3 text-xs text-gray-400 dark:text-gray-500">No tables seated right now.</p>
+        (filteredSeated.length === 0 ? (
+          <p className="p-3 text-xs text-gray-400 dark:text-gray-500">{search ? "No matching tables." : "No tables seated right now."}</p>
         ) : (
           <ul className="max-h-[26rem] divide-y divide-gray-100 overflow-y-auto dark:divide-gray-700">
-            {seatedSummary.map((e) => (
+            {filteredSeated.map((e) => (
               <li key={e.tableId} className="flex items-center justify-between px-3 py-2.5 text-sm">
                 <div>
                   <div className="font-medium text-gray-900 dark:text-gray-100">
@@ -253,11 +316,11 @@ export function FloorPlanSidePanel({ date }: Props) {
         ))}
 
       {tab === "waitlist" &&
-        (!waitlist || waitlist.length === 0 ? (
-          <p className="p-3 text-xs text-gray-400 dark:text-gray-500">No one is waiting right now.</p>
+        (filteredWaitlist.length === 0 ? (
+          <p className="p-3 text-xs text-gray-400 dark:text-gray-500">{search ? "No matching parties." : "No one is waiting right now."}</p>
         ) : (
           <ul className="max-h-[26rem] divide-y divide-gray-100 overflow-y-auto dark:divide-gray-700">
-            {waitlist.map((entry) => (
+            {filteredWaitlist.map((entry) => (
               <li key={entry.id} className="px-3 py-2.5 text-sm">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
@@ -283,12 +346,15 @@ export function FloorPlanSidePanel({ date }: Props) {
           <SeatTableModal
             key="seat-reservation"
             title={`${seatingReservation.guest.firstName} ${seatingReservation.guest.lastName}`}
-            subtitle={`Party of ${seatingReservation.partySize} · choose an open table.`}
+            subtitle={`${minutesToLabel(
+              new Date(seatingReservation.dateTime).getHours() * 60 + new Date(seatingReservation.dateTime).getMinutes()
+            )}, party of ${seatingReservation.partySize}`}
             partySize={seatingReservation.partySize}
             preferredTableId={seatingReservation.tableId}
-            submitting={seatReservation.isPending}
+            submitting={seatReservation.isPending || preAssignReservation.isPending}
             onClose={() => setSeatingReservation(null)}
             onSeat={(tableId) => seatReservation.mutate({ id: seatingReservation.id, tableId })}
+            onPreAssign={(tableId) => preAssignReservation.mutate({ id: seatingReservation.id, tableId })}
           />
         )}
 

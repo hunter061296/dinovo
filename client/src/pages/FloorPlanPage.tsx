@@ -1,17 +1,18 @@
 import { useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { AnimatePresence } from "motion/react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
 import { getSocket } from "../lib/socket";
 import type { RestaurantTable, Section, SeatedSummaryEntry } from "../lib/tables";
-import type { Reservation } from "../lib/reservations";
+import type { Reservation, Shift } from "../lib/reservations";
 import { minutesToLabel } from "../lib/reservations";
 import { TableStatusPopover } from "../components/floorplan/TableStatusPopover";
 import { FloorPlanSidePanel } from "../components/floorplan/FloorPlanSidePanel";
 import { FloorPlanCanvas } from "../components/floorplan/FloorPlanCanvas";
 import { DateSwitcher, todayLocalISODate } from "../components/DateSwitcher";
+import { ReservationFormModal, type ReservationFormValues } from "../components/reservations/ReservationFormModal";
 
 export function FloorPlanPage() {
   const { user } = useAuth();
@@ -46,8 +47,26 @@ export function FloorPlanPage() {
     queryFn: () => api.get("/tables/seated-summary").then((res) => res.data),
     refetchInterval: 30_000,
   });
+  // For the reservation detail panel's pacing-warning calc (ReservationFormModal).
+  const { data: shifts } = useQuery<Shift[]>({
+    queryKey: ["shifts"],
+    queryFn: () => api.get("/shifts").then((res) => res.data),
+  });
 
   const [statusTable, setStatusTable] = useState<RestaurantTable | null>(null);
+  const [openReservation, setOpenReservation] = useState<Reservation | null>(null);
+  const [reservationError, setReservationError] = useState<string | null>(null);
+
+  const updateReservation = useMutation({
+    mutationFn: ({ id, values }: { id: string; values: Partial<ReservationFormValues> }) =>
+      api.patch(`/reservations/${id}`, values),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reservations", date] });
+      setOpenReservation(null);
+      setReservationError(null);
+    },
+    onError: (err: any) => setReservationError(err.response?.data?.error || "Failed to update reservation"),
+  });
 
   const seatedGuestByTable = new Map(
     (seatedSummary ?? []).map((e) => [e.tableId, e.guestName ?? "Walk-in"] as const)
@@ -120,7 +139,7 @@ export function FloorPlanPage() {
 
       {tables && (
         <div className="flex flex-col gap-4 sm:flex-row">
-          <FloorPlanSidePanel date={date} />
+          <FloorPlanSidePanel date={date} onOpenReservation={setOpenReservation} />
 
           <FloorPlanCanvas
             tables={tables}
@@ -148,6 +167,24 @@ export function FloorPlanPage() {
               navigate(`/floor-plan/settings?table=${statusTable.id}`);
             }}
             onClose={() => setStatusTable(null)}
+          />
+        )}
+
+        {openReservation && (
+          <ReservationFormModal
+            key="reservation-detail"
+            date={date}
+            shifts={shifts ?? []}
+            reservationsThatDay={dateReservations ?? []}
+            initial={openReservation}
+            submitting={updateReservation.isPending}
+            error={reservationError}
+            onClose={() => {
+              setOpenReservation(null);
+              setReservationError(null);
+            }}
+            onSubmit={(values) => updateReservation.mutate({ id: openReservation.id, values })}
+            onCancelReservation={() => updateReservation.mutate({ id: openReservation.id, values: { status: "CANCELLED" } })}
           />
         )}
       </AnimatePresence>

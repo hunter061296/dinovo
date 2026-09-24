@@ -73,7 +73,12 @@ real is the same fix as above; both endpoints would call the same
   list and each table's "who's next" badge — table status colors, the Seated
   tab, and the Waitlist tab always reflect right now regardless of the
   browsed date, since there's no historical snapshot of live floor state to
-  look back at (nor a POS to have generated one).
+  look back at (nor a POS to have generated one). "Pre-Assign" (the sidebar's
+  per-row table-assign icon, separate from clicking a guest's name to open
+  their reservation) offers every table big enough for the party regardless
+  of its current live status, since it's for a future time — the server's
+  existing double-booking check (`tableAvailability.ts`) is what actually
+  guards against a genuine conflict, not anything client-side.
 - **Reservation book (Phase 4)**: table assignment is a plain dropdown, not
   drag-and-drop onto the floor plan (that interaction lives on the Floor Plan
   page instead, for table *status*). Assigning the same table to two
