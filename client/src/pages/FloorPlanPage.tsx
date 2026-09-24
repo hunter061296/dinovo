@@ -114,12 +114,9 @@ export function FloorPlanPage() {
   }, [queryClient]);
 
   return (
-    <div className="flex h-full flex-col gap-4">
+    <div className="flex h-full flex-col gap-3">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Floor Plan</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Click a table to change its status.</p>
-        </div>
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Floor Plan</h1>
 
         {/* Date switcher — browses the Upcoming list/table badges; live floor status stays "now". */}
         <DateSwitcher date={date} onChange={setDate} />
