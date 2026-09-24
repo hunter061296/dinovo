@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence } from "motion/react";
 import { api } from "../../lib/api";
@@ -15,10 +15,47 @@ function todayLocalISODate() {
 }
 
 type Tab = "upcoming" | "seated" | "waitlist";
+type SortKey = "time" | "name" | "partySize" | "table" | "created";
 
-export function FloorPlanSidePanel() {
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "time", label: "Scheduled time" },
+  { key: "name", label: "Name" },
+  { key: "partySize", label: "Party size" },
+  { key: "table", label: "Table" },
+  { key: "created", label: "Created date" },
+];
+
+function sortReservations(list: Reservation[], sortBy: SortKey): Reservation[] {
+  const sorted = [...list];
+  switch (sortBy) {
+    case "name":
+      return sorted.sort((a, b) => `${a.guest.lastName} ${a.guest.firstName}`.localeCompare(`${b.guest.lastName} ${b.guest.firstName}`));
+    case "partySize":
+      return sorted.sort((a, b) => a.partySize - b.partySize);
+    case "table":
+      // Unassigned reservations sort after every assigned table, not before.
+      return sorted.sort((a, b) => (a.table?.number ?? Infinity) - (b.table?.number ?? Infinity));
+    case "created":
+      return sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    case "time":
+    default:
+      return sorted.sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+  }
+}
+
+interface Props {
+  // The day being browsed on the Floor Plan (its date switcher) — the Upcoming list is scoped to
+  // this date, but Seated/Waitlist stay live/"now" regardless, since floor and waitlist state has
+  // no historical record to browse.
+  date: string;
+}
+
+export function FloorPlanSidePanel({ date }: Props) {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>("upcoming");
+  const [sortBy, setSortBy] = useState<SortKey>("time");
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
   const [seatingReservation, setSeatingReservation] = useState<Reservation | null>(null);
   const [seatingWaitlistEntry, setSeatingWaitlistEntry] = useState<WaitlistEntry | null>(null);
 
@@ -29,11 +66,25 @@ export function FloorPlanSidePanel() {
     return () => clearInterval(t);
   }, []);
 
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (sortMenuRef.current && !sortMenuRef.current.contains(e.target as Node)) {
+        setSortMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
   const today = todayLocalISODate();
+  const isToday = date === today;
+
   const { data: reservations } = useQuery<Reservation[]>({
-    queryKey: ["reservations", today],
-    queryFn: () => api.get("/reservations", { params: { date: today } }).then((res) => res.data),
+    queryKey: ["reservations", date],
+    queryFn: () => api.get("/reservations", { params: { date } }).then((res) => res.data),
   });
+  // Seated/waitlist reflect the floor right now — always "today", independent of the date being
+  // browsed above (there's no historical snapshot of live floor state to look back at).
   const { data: seatedSummary } = useQuery<SeatedSummaryEntry[]>({
     queryKey: ["tables", "seated-summary"],
     queryFn: () => api.get("/tables/seated-summary").then((res) => res.data),
@@ -44,14 +95,16 @@ export function FloorPlanSidePanel() {
     queryFn: () => api.get("/waitlist").then((res) => res.data),
   });
 
-  // Not-yet-seated reservations for today, regardless of whether their time has already
-  // passed — a late arrival still needs seating, so it stays in this list rather than dropping off.
-  const upcoming = (reservations ?? [])
-    .filter((r) => r.status === "BOOKED")
-    .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+  // Not-yet-seated reservations for the browsed date, regardless of whether their time has
+  // already passed — a late arrival still needs seating, so it stays in this list rather than
+  // dropping off.
+  const upcoming = sortReservations(
+    (reservations ?? []).filter((r) => r.status === "BOOKED"),
+    sortBy
+  );
 
   const invalidateAfterSeating = () => {
-    queryClient.invalidateQueries({ queryKey: ["reservations", today] });
+    queryClient.invalidateQueries({ queryKey: ["reservations", date] });
     queryClient.invalidateQueries({ queryKey: ["tables"] });
     queryClient.invalidateQueries({ queryKey: ["tables", "seated-summary"] });
     queryClient.invalidateQueries({ queryKey: ["waitlist"] });
@@ -98,34 +151,85 @@ export function FloorPlanSidePanel() {
         ))}
       </div>
 
-      {tab === "upcoming" &&
-        (upcoming.length === 0 ? (
-          <p className="p-3 text-xs text-gray-400 dark:text-gray-500">Nothing else booked for today.</p>
-        ) : (
-          <ul className="max-h-[26rem] divide-y divide-gray-100 overflow-y-auto dark:divide-gray-700">
-            {upcoming.map((r) => (
-              <li key={r.id} className="px-3 py-2.5 text-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium text-gray-900 dark:text-gray-100">
-                      {r.guest.firstName} {r.guest.lastName} · {r.partySize}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {minutesToLabel(new Date(r.dateTime).getHours() * 60 + new Date(r.dateTime).getMinutes())} ·{" "}
-                      {r.table ? `Table ${r.table.number}` : "Unassigned"}
-                    </div>
-                  </div>
+      {tab === "upcoming" && (
+        <>
+          <div ref={sortMenuRef} className="relative border-b border-gray-100 px-3 py-2 dark:border-gray-700">
+            <button
+              onClick={() => setSortMenuOpen((o) => !o)}
+              className="flex w-full items-center justify-between text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            >
+              <span>
+                Sort: <span className="font-medium text-gray-700 dark:text-gray-300">{SORT_OPTIONS.find((o) => o.key === sortBy)?.label}</span>
+              </span>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                <path
+                  fillRule="evenodd"
+                  d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+            {sortMenuOpen && (
+              <div className="absolute left-3 right-3 top-full z-10 mt-1 rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-700">
+                {SORT_OPTIONS.map((opt) => (
                   <button
-                    onClick={() => setSeatingReservation(r)}
-                    className="shrink-0 rounded-md bg-accent-600 px-2 py-1 text-xs font-medium text-white hover:bg-accent-700"
+                    key={opt.key}
+                    onClick={() => {
+                      setSortBy(opt.key);
+                      setSortMenuOpen(false);
+                    }}
+                    className="flex w-full items-center justify-between px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-600"
                   >
-                    Seat
+                    {opt.label}
+                    {sortBy === opt.key && (
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-accent-600 dark:text-accent-400">
+                        <path
+                          fillRule="evenodd"
+                          d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    )}
                   </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ))}
+                ))}
+              </div>
+            )}
+          </div>
+
+          {upcoming.length === 0 ? (
+            <p className="p-3 text-xs text-gray-400 dark:text-gray-500">
+              {isToday ? "Nothing else booked for today." : "Nothing booked for this date."}
+            </p>
+          ) : (
+            <ul className="max-h-[26rem] divide-y divide-gray-100 overflow-y-auto dark:divide-gray-700">
+              {upcoming.map((r) => (
+                <li key={r.id} className="px-3 py-2.5 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-gray-900 dark:text-gray-100">
+                        {r.guest.firstName} {r.guest.lastName} · {r.partySize}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {minutesToLabel(new Date(r.dateTime).getHours() * 60 + new Date(r.dateTime).getMinutes())} ·{" "}
+                        {r.table ? `Table ${r.table.number}` : "Unassigned"}
+                      </div>
+                    </div>
+                    {/* Seating only makes sense for a party that could be here right now. */}
+                    {isToday && (
+                      <button
+                        onClick={() => setSeatingReservation(r)}
+                        className="shrink-0 rounded-md bg-accent-600 px-2 py-1 text-xs font-medium text-white hover:bg-accent-700"
+                      >
+                        Seat
+                      </button>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
 
       {tab === "seated" &&
         (!seatedSummary || seatedSummary.length === 0 ? (

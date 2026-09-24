@@ -69,7 +69,11 @@ real is the same fix as above; both endpoints would call the same
 - **Floor plan (Phase 3)**: no collision detection when dragging — tables can
   be dropped on top of each other. The canvas scales to fit a tablet screen
   but doesn't pan/zoom, so a much larger floor plan (50+ tables) would get
-  cramped.
+  cramped. The page's date switcher only scopes the Upcoming reservations
+  list and each table's "who's next" badge — table status colors, the Seated
+  tab, and the Waitlist tab always reflect right now regardless of the
+  browsed date, since there's no historical snapshot of live floor state to
+  look back at (nor a POS to have generated one).
 - **Reservation book (Phase 4)**: table assignment is a plain dropdown, not
   drag-and-drop onto the floor plan (that interaction lives on the Floor Plan
   page instead, for table *status*). Assigning the same table to two
