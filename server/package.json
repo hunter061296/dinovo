@@ -11,7 +11,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "seed": "tsx prisma/seed.ts",
-    "seed:if-empty": "tsx prisma/seedIfEmpty.ts"
+    "seed:if-empty": "tsx prisma/seedIfEmpty.ts",
+    "seed:week": "tsx prisma/seedWeek.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
