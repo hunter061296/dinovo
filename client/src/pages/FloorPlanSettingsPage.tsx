@@ -93,8 +93,8 @@ export function FloorPlanSettingsPage() {
   });
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+    <div className="flex h-full flex-col gap-4">
+      <div className="flex shrink-0 items-center justify-between">
         <div>
           <div className="mb-1 flex items-center gap-2 text-xs font-medium text-gray-400 dark:text-gray-500">
             <Link to="/floor-plan" className="hover:underline">
@@ -114,19 +114,21 @@ export function FloorPlanSettingsPage() {
         </button>
       </div>
 
-      {isLoading && <div className="text-sm text-gray-500 dark:text-gray-400">Loading floor plan...</div>}
-      {isError && <div className="text-sm text-red-600 dark:text-red-400">Failed to load the floor plan.</div>}
+      {isLoading && <div className="shrink-0 text-sm text-gray-500 dark:text-gray-400">Loading floor plan...</div>}
+      {isError && <div className="shrink-0 text-sm text-red-600 dark:text-red-400">Failed to load the floor plan.</div>}
 
       {tables && (
-        <FloorPlanCanvas
-          tables={tables}
-          sections={sections}
-          draggable
-          showManageSections
-          onManageSections={() => setSectionManagerOpen(true)}
-          onTableClick={setFormModal}
-          emptyMessageNoTables='No tables yet. Click "Add table" to build your floor plan.'
-        />
+        <div className="flex min-h-0 flex-1">
+          <FloorPlanCanvas
+            tables={tables}
+            sections={sections}
+            draggable
+            showManageSections
+            onManageSections={() => setSectionManagerOpen(true)}
+            onTableClick={setFormModal}
+            emptyMessageNoTables='No tables yet. Click "Add table" to build your floor plan.'
+          />
+        </div>
       )}
 
       <AnimatePresence>

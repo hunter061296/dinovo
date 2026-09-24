@@ -58,25 +58,33 @@ export function FloorPlanCanvas({
     .map((t) => (droppedPositions[t.id] ? { ...t, ...droppedPositions[t.id] } : t));
   const selectedSectionName = selectedSectionId ? sections?.find((s) => s.id === selectedSectionId)?.name : "All tables";
 
-  // On a tablet-width screen the 900px canvas is wider than the viewport — rather than force
-  // horizontal scrolling to see the rest of the floor plan, scale the whole canvas down to fit.
-  // Manual zoom (below) then multiplies on top of this auto-fit scale.
+  const canvasHeight = Math.max(CANVAS_HEIGHT - 40, ...displayedTables.map((t) => t.positionY + 220), 200);
+
+  // The available drawing area is never big enough to guarantee the canvas fits at 1:1 (a tablet
+  // screen, or a floor plan tall enough that its tables extend past CANVAS_HEIGHT) — scale the
+  // whole canvas down on both axes so it always fits with no scrolling, rather than force a
+  // scrollbar. Manual zoom (below) then multiplies on top of this auto-fit scale.
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasWrapperRef = useRef<HTMLDivElement>(null);
-  const [autoFitScale, setAutoFitScale] = useState(1);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [manualZoom, setManualZoom] = useState(1);
-  const scale = autoFitScale * manualZoom;
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const observer = new ResizeObserver(([entry]) => {
-      setAutoFitScale(Math.min(1, entry.contentRect.width / CANVAS_WIDTH));
+      setContainerSize({ width: entry.contentRect.width, height: entry.contentRect.height });
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [tables]);
+  }, []);
+
+  const autoFitScale =
+    containerSize.width > 0 && containerSize.height > 0
+      ? Math.min(1, containerSize.width / CANVAS_WIDTH, containerSize.height / canvasHeight)
+      : 1;
+  const scale = autoFitScale * manualZoom;
 
   useEffect(() => {
     const handler = () => setIsFullscreen(!!document.fullscreenElement);
@@ -167,8 +175,6 @@ export function FloorPlanCanvas({
     );
   }
 
-  const canvasHeight = Math.max(CANVAS_HEIGHT - 40, ...displayedTables.map((t) => t.positionY + 220), 200);
-
   return (
     <DndContext
       sensors={sensors}
@@ -180,7 +186,12 @@ export function FloorPlanCanvas({
       <div ref={canvasWrapperRef} className={`relative min-h-0 flex-1 ${isFullscreen ? "bg-white p-4 dark:bg-gray-900" : ""}`}>
         <div
           ref={containerRef}
-          className="relative h-full overflow-auto rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
+          // autoFitScale (above) scales the canvas to fit this box on both axes, so it never
+          // needs to scroll — deliberately overflow-hidden rather than overflow-auto: a CSS
+          // transform: scale() doesn't shrink an element's contribution to scrollWidth/
+          // scrollHeight (only its paint), so with overflow-auto the browser still offered a
+          // scrollbar for the pre-scale layout box even though nothing was actually clipped.
+          className="relative h-full overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
           style={{
             width: "100%",
             maxWidth: isFullscreen ? undefined : CANVAS_WIDTH + 40,
