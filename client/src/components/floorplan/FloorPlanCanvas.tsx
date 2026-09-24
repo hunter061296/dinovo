@@ -10,6 +10,15 @@ const CANVAS_WIDTH = 900;
 const CANVAS_HEIGHT = 520;
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2;
+// Visual reference grid for the layout editor — 4x SNAP_GRID (see lib/floorplanSnap.ts) so each
+// square marks where a dragged table actually snaps, not an arbitrary decoration.
+const GRID_SIZE = 40;
+const gridBackground = {
+  backgroundImage:
+    "linear-gradient(to right, var(--color-grid-line) 1px, transparent 1px), " +
+    "linear-gradient(to bottom, var(--color-grid-line) 1px, transparent 1px)",
+  backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
+};
 
 interface Props {
   // All tables, unfiltered — the canvas owns section filtering internally.
@@ -184,6 +193,8 @@ export function FloorPlanCanvas({
             style={{
               width: CANVAS_WIDTH,
               height: canvasHeight,
+              // Grid only shown while editing the layout — the live view has no need for it.
+              ...(draggable ? gridBackground : undefined),
               // Only apply the transform when it actually does something. Chrome has a
               // compositing bug where the cursor can render behind (rather than on top of) a
               // descendant of a *transformed* ancestor — including transform: scale(1), a

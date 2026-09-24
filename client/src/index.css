@@ -91,6 +91,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Floor plan layout-editor grid lines (see FloorPlanCanvas) — subtle in light mode, a touch
+   brighter in dark mode so it still reads against the darker canvas background. */
+:root {
+  --color-grid-line: rgb(0 0 0 / 6%);
+}
+.dark {
+  --color-grid-line: rgb(255 255 255 / 8%);
+}
+
 /* Dark mode swaps only the page/card chrome; accent colors stay the same custom properties.
    Setting a base text color here is a safety net for any element that doesn't get an explicit
    dark:text-* utility below — better a slightly-off default than invisible black-on-near-black text. */
