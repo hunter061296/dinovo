@@ -8,7 +8,7 @@ import { STATUS_BANNER_STYLES, STATUS_LABELS, SUGGESTED_RESERVATION_TAGS } from 
 import type { GuestDetail } from "../../lib/guests";
 import { coversInSlot, findPacingRule } from "../../lib/pacing";
 import { GuestPicker, type NewGuestInput } from "./GuestPicker";
-import { ModalBackdrop, ModalPanel } from "../Modal";
+import { ModalBackdrop, ModalCloseButton, ModalPanel } from "../Modal";
 import { TagBadge } from "../TagBadge";
 
 export interface ReservationFormValues {
@@ -164,13 +164,17 @@ export function ReservationFormModal({
       >
         {/* Status banner — styled prominently like OpenTable's reservation panel, not a small badge. */}
         {initial && (
-          <div className={`px-5 py-3 text-sm font-semibold ${STATUS_BANNER_STYLES[initial.status]}`}>
+          <div className={`flex items-center justify-between gap-2 px-5 py-3 text-sm font-semibold ${STATUS_BANNER_STYLES[initial.status]}`}>
             {STATUS_LABELS[initial.status]}
+            <ModalCloseButton onClick={onClose} className="shrink-0 rounded-md p-1 text-current opacity-70 hover:bg-black/10 hover:opacity-100" />
           </div>
         )}
 
         <div className="p-5">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">{initial ? "Reservation details" : "New reservation"}</h2>
+          <div className="mb-4 flex items-start justify-between gap-2">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{initial ? "Reservation details" : "New reservation"}</h2>
+            {!initial && <ModalCloseButton onClick={onClose} />}
+          </div>
 
           {error && <div className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">{error}</div>}
           {pacingWarning && (

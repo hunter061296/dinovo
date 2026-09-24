@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import type { Section } from "../../lib/tables";
-import { ModalBackdrop, ModalPanel } from "../Modal";
+import { ModalBackdrop, ModalCloseButton, ModalPanel } from "../Modal";
 
 interface Props {
   sections: Section[];
@@ -50,7 +50,10 @@ export function SectionManagerModal({ sections, onClose }: Props) {
   return (
     <ModalBackdrop>
       <ModalPanel className="w-full max-w-sm rounded-lg bg-white p-5 shadow-lg dark:bg-gray-800">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Manage sections</h2>
+        <div className="mb-4 flex items-start justify-between gap-2">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Manage sections</h2>
+          <ModalCloseButton onClick={onClose} />
+        </div>
 
         {error && <div className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">{error}</div>}
 

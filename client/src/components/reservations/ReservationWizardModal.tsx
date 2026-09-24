@@ -9,7 +9,7 @@ import type { RestaurantTable } from "../../lib/tables";
 import { GuestPicker, type NewGuestInput } from "./GuestPicker";
 import { MiniCalendar } from "./MiniCalendar";
 import type { ReservationFormValues } from "./ReservationFormModal";
-import { ModalBackdrop, ModalPanel } from "../Modal";
+import { ModalBackdrop, ModalCloseButton, ModalPanel } from "../Modal";
 import { DURATION, useMotionDuration } from "../../lib/motion";
 
 // Slide distance is deliberately small (24px) — this should read as a quick directional cue
@@ -144,23 +144,26 @@ export function ReservationWizardModal({ initialDate, onSubmit, onClose, submitt
     <ModalBackdrop>
       <ModalPanel className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-white shadow-lg dark:bg-gray-800">
         {/* Step indicator */}
-        <div className="flex items-center gap-1 border-b border-gray-100 px-5 pb-3 pt-4 dark:border-gray-700">
-          {STEPS.map((s, i) => (
-            <div key={s} className="flex flex-1 items-center gap-1">
-              <div
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-                  i < stepIndex
-                    ? "bg-accent-600 text-white"
-                    : i === stepIndex
-                      ? "border-2 border-accent-600 text-accent-600 dark:text-accent-400"
-                      : "border border-gray-300 text-gray-400 dark:border-gray-600 dark:text-gray-500"
-                }`}
-              >
-                {i < stepIndex ? "✓" : i + 1}
+        <div className="flex items-center gap-3 border-b border-gray-100 px-5 pb-3 pt-4 dark:border-gray-700">
+          <div className="flex flex-1 items-center gap-1">
+            {STEPS.map((s, i) => (
+              <div key={s} className="flex flex-1 items-center gap-1">
+                <div
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                    i < stepIndex
+                      ? "bg-accent-600 text-white"
+                      : i === stepIndex
+                        ? "border-2 border-accent-600 text-accent-600 dark:text-accent-400"
+                        : "border border-gray-300 text-gray-400 dark:border-gray-600 dark:text-gray-500"
+                  }`}
+                >
+                  {i < stepIndex ? "✓" : i + 1}
+                </div>
+                {i < STEPS.length - 1 && <div className={`h-0.5 flex-1 ${i < stepIndex ? "bg-accent-600" : "bg-gray-200 dark:bg-gray-700"}`} />}
               </div>
-              {i < STEPS.length - 1 && <div className={`h-0.5 flex-1 ${i < stepIndex ? "bg-accent-600" : "bg-gray-200 dark:bg-gray-700"}`} />}
-            </div>
-          ))}
+            ))}
+          </div>
+          <ModalCloseButton onClick={onClose} />
         </div>
 
         <div className="flex-1 overflow-hidden px-5 py-4">

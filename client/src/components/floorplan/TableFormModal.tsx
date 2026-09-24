@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import type { RestaurantTable, Section, TableShape } from "../../lib/tables";
-import { ModalBackdrop, ModalPanel } from "../Modal";
+import { ModalBackdrop, ModalCloseButton, ModalPanel } from "../Modal";
 import { TableShapeIcon } from "./TableShapeIcon";
 
 const SHAPES: { value: TableShape; label: string }[] = [
@@ -33,7 +33,10 @@ export function TableFormModal({ initial, sections, onSubmit, onDelete, onClose,
   return (
     <ModalBackdrop>
       <ModalPanel as="form" onSubmit={handleSubmit} className="w-full max-w-sm rounded-lg bg-white p-5 shadow-lg dark:bg-gray-800">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">{initial ? `Edit table ${initial.number}` : "Add table"}</h2>
+        <div className="mb-4 flex items-start justify-between gap-2">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{initial ? `Edit table ${initial.number}` : "Add table"}</h2>
+          <ModalCloseButton onClick={onClose} />
+        </div>
 
         {error && <div className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">{error}</div>}
 

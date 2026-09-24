@@ -28,6 +28,26 @@ export function ModalBackdrop({ onClick, className, children }: BackdropProps) {
   );
 }
 
+// Shared X-close button for every modal header, so closing one is always a single click in the
+// same corner rather than "keep clicking Cancel/Back until it's gone" (the wizard especially).
+export function ModalCloseButton({ onClick, className }: { onClick: () => void; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Close"
+      className={
+        className ??
+        "shrink-0 rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+      }
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
+        <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+      </svg>
+    </button>
+  );
+}
+
 interface PanelProps {
   as?: "div" | "form";
   className: string;
