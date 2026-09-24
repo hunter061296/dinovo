@@ -113,11 +113,11 @@ export function FloorPlanPage() {
     };
   }, [queryClient]);
 
-  // Header-to-canvas gap matches <main>'s own top padding (p-4 sm:p-6 in Layout.tsx), so the
-  // Edit layout button/header row sits with equal space above (to the app header) and below
-  // (to the canvas).
+  // Pulls the page up by the extra bit of <main>'s own top padding (p-4 sm:p-6 in Layout.tsx)
+  // beyond this gap-3 (12px), so the Edit layout button/header row sits with equal space above
+  // (to the app header) and below (to the canvas) — both 12px.
   return (
-    <div className="flex h-full flex-col gap-4 sm:gap-6">
+    <div className="-mt-1 flex h-full flex-col gap-3 sm:-mt-3">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Floor Plan</h1>
 
