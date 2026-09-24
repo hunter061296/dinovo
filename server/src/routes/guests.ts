@@ -95,4 +95,14 @@ router.patch("/:id", async (req, res) => {
   }
 });
 
+// Stub — see NOTES.md. Same pattern as POST /api/tables/:id/notify: no real SMS/email provider
+// is wired up for this MVP, so nothing actually leaves the server.
+router.post("/:id/notify", async (req, res) => {
+  const guest = await prisma.guest.findUnique({ where: { id: req.params.id } });
+  if (!guest) {
+    return res.status(404).json({ error: "Guest not found" });
+  }
+  res.json({ success: true, message: `(stub) ${guest.firstName} ${guest.lastName} would be messaged here.` });
+});
+
 export default router;

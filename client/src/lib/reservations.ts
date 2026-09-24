@@ -10,6 +10,7 @@ export interface Guest {
   email: string | null;
   visitCount: number;
   noShowCount: number;
+  cancellationCount: number;
   tags: string[];
   // System-inferred tags (e.g. "Regular", "Lapsing") — kept separate from the host-editable
   // `tags` above; see server/src/lib/guestTags.ts. Merge for display, don't conflate the two.
@@ -60,10 +61,27 @@ export interface Reservation {
   table: RestaurantTable | null;
   shiftId: string | null;
   shift: Shift | null;
-  notes: string | null;
+  tags: string[];
+  generalNote: string | null;
+  offerNote: string | null;
+  foodDrinkNote: string | null;
+  seatingNote: string | null;
+  excludeFromPacing: boolean;
   seatedAt: string | null;
   completedAt: string | null;
 }
+
+// Per-visit occasion tags — separate from Guest.tags (SUGGESTED_TAGS in lib/guests.ts), which
+// describe the person rather than this one reservation.
+export const SUGGESTED_RESERVATION_TAGS = ["Anniversary", "Birthday", "Date Night", "Business", "Special Occasion"];
+
+export const STATUS_BANNER_STYLES: Record<ReservationStatus, string> = {
+  BOOKED: "bg-gray-100 text-gray-800 dark:bg-gray-700/60 dark:text-gray-200",
+  SEATED: "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200",
+  COMPLETED: "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200",
+  NO_SHOW: "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200",
+  CANCELLED: "bg-gray-200 text-gray-500 dark:bg-gray-800 dark:text-gray-500",
+};
 
 export const STATUS_LABELS: Record<ReservationStatus, string> = {
   BOOKED: "Booked",

@@ -110,6 +110,8 @@ model Guest {
   // Incremented on the transition into NO_SHOW, mirroring how visitCount tracks COMPLETED —
   // see server/src/routes/reservations.ts.
   noShowCount         Int      @default(0)
+  // Incremented on the transition into CANCELLED, same pattern as noShowCount.
+  cancellationCount   Int      @default(0)
   tags                String[] @default([])
   // System-computed tags (e.g. "Regular", "Lapsing" — see server/src/lib/guestTags.ts), kept
   // separate from the manually-edited `tags` above so a host un-tagging something manual is
@@ -165,17 +167,29 @@ model PacingRule {
 }
 
 model Reservation {
-  id          String            @id @default(uuid())
-  guestId     String
-  guest       Guest             @relation(fields: [guestId], references: [id])
-  partySize   Int
-  dateTime    DateTime
-  status      ReservationStatus @default(BOOKED)
-  tableId     String?
-  table       RestaurantTable?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
-  shiftId     String?
-  shift       Shift?            @relation(fields: [shiftId], references: [id])
-  notes       String?           @db.Text
+  id        String            @id @default(uuid())
+  guestId   String
+  guest     Guest             @relation(fields: [guestId], references: [id])
+  partySize Int
+  dateTime  DateTime
+  status    ReservationStatus @default(BOOKED)
+  tableId   String?
+  table     RestaurantTable?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  shiftId   String?
+  shift     Shift?            @relation(fields: [shiftId], references: [id])
+  // Per-visit occasion tags (e.g. "Anniversary", "Date Night") — separate from the guest-level
+  // Guest.tags above, which describe the person rather than this one visit.
+  tags      String[]          @default([])
+  // Replaces the old single `notes` field with OpenTable-style structured note fields. See
+  // migration 20260924000000_reservation_detail_fields for the notes -> generalNote backfill.
+  generalNote   String? @db.Text
+  offerNote     String? @db.Text
+  foodDrinkNote String? @db.Text
+  seatingNote   String? @db.Text
+  // When true, this reservation's covers are excluded from its slot's PacingRule.maxCovers check
+  // (client lib/pacing.ts, server lib/pacing.ts) — a host's escape hatch for a party pacing
+  // shouldn't block (a VIP, a comp'd table) without having to raise the whole slot's cap.
+  excludeFromPacing Boolean @default(false)
   seatedAt    DateTime?
   completedAt DateTime?
   createdById String?

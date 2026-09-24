@@ -26,37 +26,45 @@ export async function checkPacingCap(params: {
   partySize: number;
   shiftId: string | null | undefined;
   excludeId?: string;
+  // A party flagged excludeFromPacing doesn't consume the slot's cover cap, so it's skipped from
+  // both sides of the covers check — it neither adds to `existingCovers` for other reservations'
+  // checks (see the where filter below) nor triggers a covers warning for itself.
+  excludeFromPacing?: boolean;
 }): Promise<CapCheckResult> {
-  const { dateTime, partySize, shiftId, excludeId } = params;
+  const { dateTime, partySize, shiftId, excludeId, excludeFromPacing } = params;
   if (!shiftId) return { overCap: false, capDetail: null };
 
   const slot = slotMinutesFor(dateTime);
   const rule = await prisma.pacingRule.findFirst({ where: { shiftId, timeSlotMinutes: slot } });
   if (!rule) return { overCap: false, capDetail: null };
 
-  const dayStart = new Date(dateTime);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-
-  const sameDayReservations = await prisma.reservation.findMany({
-    where: {
-      dateTime: { gte: dayStart, lt: dayEnd },
-      status: { in: COUNTED_STATUSES },
-      ...(excludeId ? { id: { not: excludeId } } : {}),
-    },
-    select: { dateTime: true, partySize: true },
-  });
-
-  const existingCovers = sameDayReservations
-    .filter((r) => slotMinutesFor(r.dateTime) === slot)
-    .reduce((sum, r) => sum + r.partySize, 0);
-
-  const projected = existingCovers + partySize;
-
   const messages: string[] = [];
-  if (projected > rule.maxCovers) {
-    messages.push(`This slot would have ${projected}/${rule.maxCovers} covers.`);
+
+  if (!excludeFromPacing) {
+    const dayStart = new Date(dateTime);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+
+    const sameDayReservations = await prisma.reservation.findMany({
+      where: {
+        dateTime: { gte: dayStart, lt: dayEnd },
+        status: { in: COUNTED_STATUSES },
+        excludeFromPacing: false,
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+      },
+      select: { dateTime: true, partySize: true },
+    });
+
+    const existingCovers = sameDayReservations
+      .filter((r) => slotMinutesFor(r.dateTime) === slot)
+      .reduce((sum, r) => sum + r.partySize, 0);
+
+    const projected = existingCovers + partySize;
+    if (projected > rule.maxCovers) {
+      messages.push(`This slot would have ${projected}/${rule.maxCovers} covers.`);
+    }
   }
+
   if (partySize > rule.maxPartySize) {
     messages.push(`Party size ${partySize} exceeds this slot's max of ${rule.maxPartySize}.`);
   }

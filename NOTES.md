@@ -20,6 +20,12 @@ function, call it from the existing endpoint, and store a delivery log
 (a `Notification` table: guestId, channel, status, sentAt) so hosts can see
 whether a message actually went out rather than just trusting a button click.
 
+The Reservation detail panel's "Message guest" button (`POST
+/api/guests/:id/notify`) is the same stub, one level up — it always returns
+`{ success: true, message: "(stub) ..." }` with no SMS/email sent. Making it
+real is the same fix as above; both endpoints would call the same
+`sendGuestNotification` once it exists.
+
 ## Out of scope (and how I'd add them)
 
 - **Public booking widget.** This app is host-facing only. A public booking

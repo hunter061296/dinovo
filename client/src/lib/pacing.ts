@@ -21,6 +21,12 @@ export function slotMinutesFor(dateTime: string, slotSize = 30): number {
 
 export function coversInSlot(reservations: Reservation[], slotMinutes: number, excludeId?: string): number {
   return reservations
-    .filter((r) => r.id !== excludeId && COUNTED_STATUSES.has(r.status) && slotMinutesFor(r.dateTime) === slotMinutes)
+    .filter(
+      (r) =>
+        r.id !== excludeId &&
+        !r.excludeFromPacing &&
+        COUNTED_STATUSES.has(r.status) &&
+        slotMinutesFor(r.dateTime) === slotMinutes
+    )
     .reduce((sum, r) => sum + r.partySize, 0);
 }

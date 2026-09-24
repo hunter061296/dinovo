@@ -45,7 +45,12 @@ const createReservationSchema = z
     partySize: z.number().int().positive(),
     dateTime: z.coerce.date(),
     tableId: z.string().uuid().nullable().optional(),
-    notes: z.string().optional(),
+    tags: z.array(z.string().min(1)).optional(),
+    generalNote: z.string().optional(),
+    offerNote: z.string().optional(),
+    foodDrinkNote: z.string().optional(),
+    seatingNote: z.string().optional(),
+    excludeFromPacing: z.boolean().optional(),
   })
   .refine((data) => data.guestId || data.newGuest, {
     message: "Either guestId or newGuest is required",
@@ -56,7 +61,7 @@ router.post("/", async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0].message });
   }
-  const { partySize, dateTime, tableId, notes } = parsed.data;
+  const { partySize, dateTime, tableId, tags, generalNote, offerNote, foodDrinkNote, seatingNote, excludeFromPacing } = parsed.data;
 
   if (tableId) {
     const conflict = await findConflictingReservation({ tableId, dateTime });
@@ -83,13 +88,18 @@ router.post("/", async (req, res) => {
       dateTime,
       tableId: tableId || null,
       shiftId: shift?.id,
-      notes,
+      tags,
+      generalNote,
+      offerNote,
+      foodDrinkNote,
+      seatingNote,
+      excludeFromPacing,
       createdById: req.user!.sub,
     },
     include,
   });
 
-  const cap = await checkPacingCap({ dateTime, partySize, shiftId: shift?.id });
+  const cap = await checkPacingCap({ dateTime, partySize, shiftId: shift?.id, excludeFromPacing });
   if (cap.overCap) {
     console.warn(`[pacing] reservation ${reservation.id} exceeds cap: ${cap.capDetail}`);
   }
@@ -100,7 +110,12 @@ const updateReservationSchema = z.object({
   partySize: z.number().int().positive().optional(),
   dateTime: z.coerce.date().optional(),
   tableId: z.string().uuid().nullable().optional(),
-  notes: z.string().optional(),
+  tags: z.array(z.string().min(1)).optional(),
+  generalNote: z.string().optional(),
+  offerNote: z.string().optional(),
+  foodDrinkNote: z.string().optional(),
+  seatingNote: z.string().optional(),
+  excludeFromPacing: z.boolean().optional(),
   status: z.nativeEnum(ReservationStatus).optional(),
 });
 
@@ -146,12 +161,18 @@ router.patch("/:id", async (req, res) => {
   }
 
   let cap: { overCap: boolean; capDetail: string | null } = { overCap: false, capDetail: null };
-  if (parsed.data.partySize !== undefined || parsed.data.dateTime !== undefined || parsed.data.status !== undefined) {
+  if (
+    parsed.data.partySize !== undefined ||
+    parsed.data.dateTime !== undefined ||
+    parsed.data.status !== undefined ||
+    parsed.data.excludeFromPacing !== undefined
+  ) {
     cap = await checkPacingCap({
       dateTime: parsed.data.dateTime ?? existing.dateTime,
       partySize: parsed.data.partySize ?? existing.partySize,
       shiftId: parsed.data.dateTime ? (data.shiftId as string | null) : existing.shiftId,
       excludeId: existing.id,
+      excludeFromPacing: parsed.data.excludeFromPacing ?? existing.excludeFromPacing,
     });
     if (cap.overCap) {
       console.warn(`[pacing] reservation ${existing.id} update exceeds cap: ${cap.capDetail}`);
@@ -181,6 +202,14 @@ router.patch("/:id", async (req, res) => {
         data: { noShowCount: { increment: 1 } },
       });
       await recomputeAutoTags(reservation.guestId);
+    }
+    // Same pattern again for cancellations — surfaced in the reservation detail panel's guest
+    // mini-stats, not part of the auto-tag rules above.
+    if (parsed.data.status === "CANCELLED" && existing.status !== "CANCELLED") {
+      await prisma.guest.update({
+        where: { id: reservation.guestId },
+        data: { cancellationCount: { increment: 1 } },
+      });
     }
 
     // Keep the floor plan in sync with the reservation book: seating a reservation occupies its

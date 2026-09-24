@@ -136,7 +136,7 @@ export function ReservationWizardModal({ initialDate, onSubmit, onClose, submitt
       partySize,
       dateTime: dateTime.toISOString(),
       tableId: tableId || null,
-      notes,
+      generalNote: notes,
     });
   }
 
