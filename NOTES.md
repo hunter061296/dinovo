@@ -109,6 +109,12 @@ real is the same fix as above; both endpoints would call the same
   full table-status audit log to derive it from directly — accurate only as
   long as hosts promptly update status. Only Today/This week ranges, no
   custom date range, no export.
+- **Printable reservations list**: no "Payment status" column, unlike OpenTable's — Dinovo has
+  no POS/payment integration, so there's nothing real to put there (flagged on the print page
+  itself, not just here). CSV export and the print view share the same row-building logic
+  (`client/src/lib/reservationsPrint.ts`) so they can't drift apart. The "Notes and tags" column
+  shows the first non-empty of the four Phase-2 note fields, truncated to 60 characters — not all
+  four, to keep the printed row to one line.
 - **Shift Overview report**: "Avg. per-cover spend" and "Total guest spend"
   show as "— (requires POS integration)" rather than $0 — Dinovo has no
   POS/payment integration, so there's no guest-spend data to report, faked

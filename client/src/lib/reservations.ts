@@ -69,6 +69,7 @@ export interface Reservation {
   excludeFromPacing: boolean;
   seatedAt: string | null;
   completedAt: string | null;
+  createdAt: string;
 }
 
 // Per-visit occasion tags — separate from Guest.tags (SUGGESTED_TAGS in lib/guests.ts), which

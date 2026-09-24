@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { AnimatePresence } from "motion/react";
 import { api } from "../lib/api";
 import type { Shift } from "../lib/reservations";
@@ -101,6 +102,12 @@ export function ReservationsPage() {
             onChange={(e) => setDate(e.target.value)}
             className="rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
           />
+          <Link
+            to={`/reservations/print?date=${date}`}
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            Print / Export
+          </Link>
           <button
             onClick={() => setModal("add")}
             className="rounded-md bg-accent-600 px-4 py-2 text-sm font-medium text-white hover:bg-accent-700"

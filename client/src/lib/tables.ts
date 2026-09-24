@@ -1,6 +1,13 @@
 export type TableShape = "ROUND" | "SQUARE" | "RECTANGLE";
 export type TableStatus = "OPEN" | "SEATED" | "ORDERED" | "NEEDS_CLEANING";
 
+export const TABLE_STATUS_LABELS: Record<TableStatus, string> = {
+  OPEN: "Open",
+  SEATED: "Seated",
+  ORDERED: "Ordered",
+  NEEDS_CLEANING: "Needs Cleaning",
+};
+
 export interface RestaurantTable {
   id: string;
   number: number;

@@ -100,6 +100,18 @@ body {
   color-scheme: dark;
 }
 
+/* Printed pages (see ReservationsPrintPage) always print light, regardless of the active
+   Light/Dark/System toggle — a dark background would waste toner and most printers ignore
+   background colors anyway, so force the safe default rather than rely on print:* utilities
+   catching every element. */
+@media print {
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+}
+
 /* Floor plan table cursors. Built-in SVG hands rather than the grab/grabbing keywords: Chrome
    draws those from the OS cursor theme, and where the theme has no open-hand image it draws
    nothing, so the cursor vanished over tables. Keyword fallbacks only apply if the SVG fails.
