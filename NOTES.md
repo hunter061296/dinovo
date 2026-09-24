@@ -109,6 +109,15 @@ real is the same fix as above; both endpoints would call the same
   full table-status audit log to derive it from directly — accurate only as
   long as hosts promptly update status. Only Today/This week ranges, no
   custom date range, no export.
+- **Shift Overview report**: "Avg. per-cover spend" and "Total guest spend"
+  show as "— (requires POS integration)" rather than $0 — Dinovo has no
+  POS/payment integration, so there's no guest-spend data to report, faked
+  or otherwise. The trend comparison averages the same metric across the
+  trailing 4 occurrences of that shift (`TREND_LOOKBACK_OCCURRENCES` in
+  `server/src/lib/reportMetrics.ts`); "Large party" is `partySize >= 6`
+  (`LARGE_PARTY_THRESHOLD`); "short-notice" is booked within 3 hours of the
+  reservation time (`SHORT_NOTICE_WINDOW_MS`) — all three are tunable
+  assumptions, not derived from a product spec.
 - **General**: single-location only (see Multi-location above); no automated
   test suite — everything in this build was verified with manual scripted
   browser passes (Playwright) during development rather than a committed
