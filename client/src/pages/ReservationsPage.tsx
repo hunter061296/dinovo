@@ -9,13 +9,9 @@ import type { Reservation } from "../lib/reservations";
 import { coversInSlot, findPacingRule } from "../lib/pacing";
 import { ReservationFormModal, type ReservationFormValues } from "../components/reservations/ReservationFormModal";
 import { ReservationWizardModal } from "../components/reservations/ReservationWizardModal";
+import { DateSwitcher, todayLocalISODate } from "../components/DateSwitcher";
 
 const SLOT_MINUTES = 30;
-
-function todayLocalISODate() {
-  const d = new Date();
-  return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
-}
 
 export function ReservationsPage() {
   const queryClient = useQueryClient();
@@ -96,12 +92,7 @@ export function ReservationsPage() {
           <p className="text-sm text-gray-500 dark:text-gray-400">Day view across all shifts.</p>
         </div>
         <div className="flex items-center gap-3">
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-          />
+          <DateSwitcher date={date} onChange={setDate} />
           <Link
             to={`/reservations/print?date=${date}`}
             className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
