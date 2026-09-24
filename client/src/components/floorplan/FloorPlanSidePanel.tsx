@@ -171,8 +171,8 @@ export function FloorPlanSidePanel({ date, onOpenReservation }: Props) {
   ];
 
   return (
-    <div className="w-full shrink-0 rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 sm:w-72">
-      <div className="border-b border-gray-100 p-2 dark:border-gray-700">
+    <div className="flex h-full w-full shrink-0 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 sm:w-72">
+      <div className="shrink-0 border-b border-gray-100 p-2 dark:border-gray-700">
         <div className="relative">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -195,7 +195,7 @@ export function FloorPlanSidePanel({ date, onOpenReservation }: Props) {
         </div>
       </div>
 
-      <div className="flex border-b border-gray-100 dark:border-gray-700">
+      <div className="flex shrink-0 border-b border-gray-100 dark:border-gray-700">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -212,8 +212,8 @@ export function FloorPlanSidePanel({ date, onOpenReservation }: Props) {
       </div>
 
       {tab === "upcoming" && (
-        <>
-          <div ref={sortMenuRef} className="relative border-b border-gray-100 px-3 py-2 dark:border-gray-700">
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div ref={sortMenuRef} className="relative shrink-0 border-b border-gray-100 px-3 py-2 dark:border-gray-700">
             <button
               onClick={() => setSortMenuOpen((o) => !o)}
               className="flex w-full items-center justify-between text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -257,11 +257,11 @@ export function FloorPlanSidePanel({ date, onOpenReservation }: Props) {
           </div>
 
           {upcoming.length === 0 ? (
-            <p className="p-3 text-xs text-gray-400 dark:text-gray-500">
+            <p className="flex-1 overflow-y-auto p-3 text-xs text-gray-400 dark:text-gray-500">
               {search ? "No matching reservations." : isToday ? "Nothing else booked for today." : "Nothing booked for this date."}
             </p>
           ) : (
-            <ul className="max-h-[26rem] divide-y divide-gray-100 overflow-y-auto dark:divide-gray-700">
+            <ul className="flex-1 divide-y divide-gray-100 overflow-y-auto dark:divide-gray-700">
               {upcoming.map((r) => (
                 <li key={r.id} className="px-3 py-2.5 text-sm">
                   <div className="flex items-center justify-between gap-2">
@@ -291,14 +291,16 @@ export function FloorPlanSidePanel({ date, onOpenReservation }: Props) {
               ))}
             </ul>
           )}
-        </>
+        </div>
       )}
 
       {tab === "seated" &&
         (filteredSeated.length === 0 ? (
-          <p className="p-3 text-xs text-gray-400 dark:text-gray-500">{search ? "No matching tables." : "No tables seated right now."}</p>
+          <p className="flex-1 overflow-y-auto p-3 text-xs text-gray-400 dark:text-gray-500">
+            {search ? "No matching tables." : "No tables seated right now."}
+          </p>
         ) : (
-          <ul className="max-h-[26rem] divide-y divide-gray-100 overflow-y-auto dark:divide-gray-700">
+          <ul className="flex-1 divide-y divide-gray-100 overflow-y-auto dark:divide-gray-700">
             {filteredSeated.map((e) => (
               <li key={e.tableId} className="flex items-center justify-between px-3 py-2.5 text-sm">
                 <div>
@@ -317,9 +319,11 @@ export function FloorPlanSidePanel({ date, onOpenReservation }: Props) {
 
       {tab === "waitlist" &&
         (filteredWaitlist.length === 0 ? (
-          <p className="p-3 text-xs text-gray-400 dark:text-gray-500">{search ? "No matching parties." : "No one is waiting right now."}</p>
+          <p className="flex-1 overflow-y-auto p-3 text-xs text-gray-400 dark:text-gray-500">
+            {search ? "No matching parties." : "No one is waiting right now."}
+          </p>
         ) : (
-          <ul className="max-h-[26rem] divide-y divide-gray-100 overflow-y-auto dark:divide-gray-700">
+          <ul className="flex-1 divide-y divide-gray-100 overflow-y-auto dark:divide-gray-700">
             {filteredWaitlist.map((entry) => (
               <li key={entry.id} className="px-3 py-2.5 text-sm">
                 <div className="flex items-center justify-between gap-2">

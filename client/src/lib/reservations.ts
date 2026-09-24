@@ -76,6 +76,23 @@ export interface Reservation {
 // describe the person rather than this one reservation.
 export const SUGGESTED_RESERVATION_TAGS = ["Anniversary", "Birthday", "Date Night", "Business", "Special Occasion"];
 
+// Shape submitted by both the reservation detail form (ReservationFormModal /
+// FloorPlanReservationPanel, via useReservationDetailForm) and the new-reservation wizard.
+export interface ReservationFormValues {
+  guestId?: string;
+  newGuest?: { firstName: string; lastName: string; phone: string; email: string };
+  partySize: number;
+  dateTime: string; // ISO
+  tableId: string | null;
+  tags?: string[];
+  generalNote?: string;
+  offerNote?: string;
+  foodDrinkNote?: string;
+  seatingNote?: string;
+  excludeFromPacing?: boolean;
+  status?: ReservationStatus;
+}
+
 export const STATUS_BANNER_STYLES: Record<ReservationStatus, string> = {
   BOOKED: "bg-gray-100 text-gray-800 dark:bg-gray-700/60 dark:text-gray-200",
   SEATED: "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200",

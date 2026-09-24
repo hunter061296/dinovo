@@ -177,14 +177,14 @@ export function FloorPlanCanvas({
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div ref={canvasWrapperRef} className={`relative flex-1 ${isFullscreen ? "bg-white p-4 dark:bg-gray-900" : ""}`}>
+      <div ref={canvasWrapperRef} className={`relative min-h-0 flex-1 ${isFullscreen ? "bg-white p-4 dark:bg-gray-900" : ""}`}>
         <div
           ref={containerRef}
-          className="relative overflow-auto rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
+          className="relative h-full overflow-auto rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
           style={{
             width: "100%",
             maxWidth: isFullscreen ? undefined : CANVAS_WIDTH + 40,
-            height: isFullscreen ? "calc(100vh - 32px)" : Math.min(canvasHeight, 640) + 40,
+            height: isFullscreen ? "calc(100vh - 32px)" : "100%",
             padding: 20,
           }}
         >

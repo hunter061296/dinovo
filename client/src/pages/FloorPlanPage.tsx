@@ -6,13 +6,13 @@ import { api } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
 import { getSocket } from "../lib/socket";
 import type { RestaurantTable, Section, SeatedSummaryEntry } from "../lib/tables";
-import type { Reservation, Shift } from "../lib/reservations";
+import type { Reservation, ReservationFormValues, Shift } from "../lib/reservations";
 import { minutesToLabel } from "../lib/reservations";
 import { TableStatusPopover } from "../components/floorplan/TableStatusPopover";
 import { FloorPlanSidePanel } from "../components/floorplan/FloorPlanSidePanel";
 import { FloorPlanCanvas } from "../components/floorplan/FloorPlanCanvas";
+import { FloorPlanReservationPanel } from "../components/floorplan/FloorPlanReservationPanel";
 import { DateSwitcher, todayLocalISODate } from "../components/DateSwitcher";
-import { ReservationFormModal, type ReservationFormValues } from "../components/reservations/ReservationFormModal";
 
 export function FloorPlanPage() {
   const { user } = useAuth();
@@ -114,8 +114,8 @@ export function FloorPlanPage() {
   }, [queryClient]);
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex h-full flex-col gap-4">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Floor Plan</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">Click a table to change its status.</p>
@@ -134,25 +134,44 @@ export function FloorPlanPage() {
         )}
       </div>
 
-      {isLoading && <div className="text-sm text-gray-500 dark:text-gray-400">Loading floor plan...</div>}
-      {isError && <div className="text-sm text-red-600 dark:text-red-400">Failed to load the floor plan.</div>}
+      {isLoading && <div className="shrink-0 text-sm text-gray-500 dark:text-gray-400">Loading floor plan...</div>}
+      {isError && <div className="shrink-0 text-sm text-red-600 dark:text-red-400">Failed to load the floor plan.</div>}
 
       {tables && (
-        <div className="flex flex-col gap-4 sm:flex-row">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 sm:flex-row">
           <FloorPlanSidePanel date={date} onOpenReservation={setOpenReservation} />
 
-          <FloorPlanCanvas
-            tables={tables}
-            sections={sections}
-            draggable={false}
-            showManageSections={false}
-            onTableClick={setStatusTable}
-            seatedGuestByTable={seatedGuestByTable}
-            upcomingByTable={upcomingByTable}
-            emptyMessageNoTables={
-              canEditLayout ? 'No tables yet. Use "Edit layout" to build your floor plan.' : "No tables yet."
-            }
-          />
+          {/* The reservation detail panel loads in place of the canvas — OpenTable-style — rather
+              than as a floating dialog over it. */}
+          {openReservation ? (
+            <FloorPlanReservationPanel
+              date={date}
+              shifts={shifts ?? []}
+              reservationsThatDay={dateReservations ?? []}
+              initial={openReservation}
+              submitting={updateReservation.isPending}
+              error={reservationError}
+              onBack={() => {
+                setOpenReservation(null);
+                setReservationError(null);
+              }}
+              onSubmit={(values) => updateReservation.mutate({ id: openReservation.id, values })}
+              onCancelReservation={() => updateReservation.mutate({ id: openReservation.id, values: { status: "CANCELLED" } })}
+            />
+          ) : (
+            <FloorPlanCanvas
+              tables={tables}
+              sections={sections}
+              draggable={false}
+              showManageSections={false}
+              onTableClick={setStatusTable}
+              seatedGuestByTable={seatedGuestByTable}
+              upcomingByTable={upcomingByTable}
+              emptyMessageNoTables={
+                canEditLayout ? 'No tables yet. Use "Edit layout" to build your floor plan.' : "No tables yet."
+              }
+            />
+          )}
         </div>
       )}
 
@@ -167,24 +186,6 @@ export function FloorPlanPage() {
               navigate(`/floor-plan/settings?table=${statusTable.id}`);
             }}
             onClose={() => setStatusTable(null)}
-          />
-        )}
-
-        {openReservation && (
-          <ReservationFormModal
-            key="reservation-detail"
-            date={date}
-            shifts={shifts ?? []}
-            reservationsThatDay={dateReservations ?? []}
-            initial={openReservation}
-            submitting={updateReservation.isPending}
-            error={reservationError}
-            onClose={() => {
-              setOpenReservation(null);
-              setReservationError(null);
-            }}
-            onSubmit={(values) => updateReservation.mutate({ id: openReservation.id, values })}
-            onCancelReservation={() => updateReservation.mutate({ id: openReservation.id, values: { status: "CANCELLED" } })}
           />
         )}
       </AnimatePresence>
