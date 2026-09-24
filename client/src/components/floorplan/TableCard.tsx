@@ -1,6 +1,10 @@
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { tableSize, type RestaurantTable } from "../../lib/tables";
+import { seatLayout, tableSize, type RestaurantTable } from "../../lib/tables";
+
+// Chairs are positioned relative to the body's outer edge, but absolute children of the button
+// are laid out from inside its border-2 — subtract it so chairs line up with the visible edge.
+const BORDER_PX = 2;
 
 const STATUS_STYLES: Record<RestaurantTable["status"], string> = {
   OPEN: "bg-white border-gray-300 text-gray-700 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200",
@@ -62,6 +66,20 @@ export function TableCard({ table, draggable, onClick, scale = 1, seatedGuestNam
       }`}
       {...(draggable ? { ...listeners, ...attributes } : {})}
     >
+      {seatLayout(table.capacity, table.shape).map((seat, i) => (
+        <span
+          key={i}
+          aria-hidden
+          className="absolute rounded-sm bg-gray-600 dark:bg-gray-400"
+          style={{
+            left: seat.cx - BORDER_PX,
+            top: seat.cy - BORDER_PX,
+            width: seat.length,
+            height: seat.thickness,
+            transform: `translate(-50%, -50%) rotate(${seat.angle}deg)`,
+          }}
+        />
+      ))}
       <span className="font-semibold">#{table.number}</span>
       {table.status === "SEATED" && seatedGuestName ? (
         <span className="max-w-full truncate text-xs opacity-75">{seatedGuestName}</span>

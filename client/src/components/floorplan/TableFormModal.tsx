@@ -74,7 +74,7 @@ export function TableFormModal({ initial, sections, onSubmit, onDelete, onClose,
                     : "border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
                 }`}
               >
-                <TableShapeIcon shape={s.value} />
+                <TableShapeIcon shape={s.value} className="h-9 w-14" />
                 {s.label}
               </button>
             ))}
