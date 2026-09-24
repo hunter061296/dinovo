@@ -6,6 +6,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { UsersPage } from "./pages/UsersPage";
 import { FloorPlanPage } from "./pages/FloorPlanPage";
+import { FloorPlanSettingsPage } from "./pages/FloorPlanSettingsPage";
 import { ReservationsPage } from "./pages/ReservationsPage";
 import { WaitlistPage } from "./pages/WaitlistPage";
 import { GuestbookPage } from "./pages/GuestbookPage";
@@ -30,6 +31,7 @@ export default function App() {
               <Route path="/guests/:id" element={<GuestProfilePage />} />
 
               <Route element={<ProtectedRoute roles={["ADMIN", "MANAGER"]} />}>
+                <Route path="/floor-plan/settings" element={<FloorPlanSettingsPage />} />
                 <Route path="/shifts" element={<ShiftsPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
               </Route>

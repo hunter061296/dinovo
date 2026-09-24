@@ -10,6 +10,7 @@ const navItems: { to: string; label: string; roles: Role[] }[] = [
   { to: "/reservations", label: "Reservations", roles: ["ADMIN", "MANAGER", "HOST"] },
   { to: "/waitlist", label: "Waitlist", roles: ["ADMIN", "MANAGER", "HOST"] },
   { to: "/guests", label: "Guestbook", roles: ["ADMIN", "MANAGER", "HOST"] },
+  { to: "/floor-plan/settings", label: "Availability Planning", roles: ["ADMIN", "MANAGER"] },
   { to: "/shifts", label: "Shifts & Pacing", roles: ["ADMIN", "MANAGER"] },
   { to: "/reports", label: "Reports", roles: ["ADMIN", "MANAGER"] },
   { to: "/users", label: "Users", roles: ["ADMIN"] },
@@ -31,7 +32,7 @@ export function Layout() {
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  end={item.to === "/"}
+                  end={item.to === "/" || item.to === "/floor-plan"}
                   className={({ isActive }) =>
                     `rounded-md px-3 py-2 text-sm font-medium ${
                       isActive
