@@ -7,6 +7,8 @@ import { DURATION, useMotionDuration } from "../lib/motion";
 import { ThemeToggle } from "./ThemeToggle";
 import { QuickSearch } from "./QuickSearch";
 import { ModalCloseButton } from "./Modal";
+import { useSocketConnected } from "../lib/socket";
+import { TimezoneMismatchBanner } from "./TimezoneMismatchBanner";
 
 const navItems: { to: string; label: string; roles: Role[] }[] = [
   { to: "/", label: "Dashboard", roles: ["ADMIN", "MANAGER", "HOST"] },
@@ -31,6 +33,7 @@ function HamburgerIcon() {
 export function Layout() {
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const socketConnected = useSocketConnected();
 
   const backdropDuration = useMotionDuration(DURATION.fast);
   const panelDuration = useMotionDuration(DURATION.normal);
@@ -117,6 +120,13 @@ export function Layout() {
           </>
         )}
       </AnimatePresence>
+
+      {!socketConnected && (
+        <div role="status" className="shrink-0 bg-amber-100 px-4 py-1.5 text-center text-sm font-medium text-amber-900 dark:bg-amber-900/50 dark:text-amber-200">
+          Live updates paused — reconnecting... Table status and the waitlist may be out of date.
+        </div>
+      )}
+      <TimezoneMismatchBanner />
 
       <main className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
         <Outlet />

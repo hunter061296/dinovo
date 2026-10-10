@@ -1,18 +1,20 @@
 # Dinovo — Restaurant Host Stand
 
 An internal host-stand and reservation management tool for a single restaurant
-location: floor plan, live table status, the reservation book, a walk-in
-waitlist, a guestbook, shift/pacing configuration, and a reporting dashboard.
+location: floor plan, live table status, the reservation book (list and a
+tables-by-time grid), a walk-in waitlist, a guestbook, shift/pacing and
+turn-time configuration, table combinations and blocks, and a reporting dashboard.
 There is no guest-facing booking site, no payments, and no ordering — see
 [NOTES.md](./NOTES.md) for what's stubbed and out of scope.
 
 ## Tech stack
 
 - **Client**: React + TypeScript + Vite + Tailwind CSS v4 + React Router + TanStack Query + dnd-kit
-- **Server**: Node.js + Express + TypeScript
+- **Server**: Node.js + Express 5 + TypeScript
 - **Database**: PostgreSQL + Prisma ORM
 - **Auth**: JWT + bcrypt, role-based access control (Admin / Manager / Host)
-- **Realtime**: Socket.io (live table status + waitlist updates across screens)
+- **Realtime**: Socket.io (live table status + waitlist updates across screens; connections require the same JWT as the API)
+- **Tests**: Vitest + Supertest against a dedicated Postgres test database
 
 ## Prerequisites
 
@@ -35,7 +37,7 @@ sudo -u postgres psql -c "CREATE DATABASE dinovo OWNER dinovo;"
 ```bash
 cd server
 npm install
-cp .env.example .env        # edit DATABASE_URL/JWT_SECRET if yours differ
+cp .env.example .env        # edit DATABASE_URL/JWT_SECRET/RESTAURANT_TIMEZONE if yours differ
 npx prisma migrate dev      # creates tables
 npm run seed                # floor plan, guests, shifts, a day of reservations
 npm run dev                 # http://localhost:4000
@@ -61,6 +63,32 @@ password `password123`):
 | `manager@dinovo.test`  | Manager |
 | `host@dinovo.test`     | Host    |
 
+### Timezone
+
+Every "which day / which shift is this reservation on" calculation on the
+server uses `RESTAURANT_TIMEZONE` (an IANA name such as `America/New_York`;
+see `server/src/lib/time.ts`). It defaults to the server's own zone, which is
+fine locally but wrong on a host that runs in UTC, like Render — set it to the
+restaurant's zone there (`render.yaml` does). The client shows times in the
+device's own zone, so host-stand devices should be set to the restaurant's
+zone; the app shows a red banner on any device where they disagree.
+
+### Tests
+
+The server has an automated suite (unit tests for the date, turn-time,
+wait-quote and status-transition logic, plus API integration tests). It needs a
+**separate** database, because every test truncates all tables:
+
+```bash
+sudo -u postgres psql -c "CREATE DATABASE dinovo_test OWNER dinovo;"
+cd server
+npm test                    # migrates dinovo_test, then runs the suite
+npm run typecheck           # typechecks src/ and test/
+```
+
+Point it elsewhere with `TEST_DATABASE_URL`; it refuses to run against a
+database whose name doesn't contain "test".
+
 ## Project structure
 
 ```
@@ -72,6 +100,7 @@ server/
   src/routes/            One file per resource (auth, users, tables, guests, ...)
   src/lib/               Shared helpers (jwt, socket.io, pacing/report math)
   src/middleware/        authenticate / authorize (RBAC)
+  test/                  Vitest suite (unit + API integration)
 
 client/
   src/pages/             One page component per route
@@ -85,6 +114,8 @@ client/
 |---|---|---|
 | `server/` | `npm run dev` | Start the API with hot reload |
 | `server/` | `npm run seed` | Reset and reseed the database |
+| `server/` | `npm run seed:week` | Add a week of test reservations on top of the seed |
+| `server/` | `npm test` | Run the test suite against `dinovo_test` |
 | `server/` | `npx prisma studio` | Browse the database visually |
 | `server/` | `npx prisma migrate dev` | Apply schema changes |
 | `client/` | `npm run dev` | Start the Vite dev server |
@@ -93,8 +124,8 @@ client/
 ## Roles
 
 - **Admin** — everything, plus user management (create/deactivate Manager and Host accounts)
-- **Manager** — everything except user management: floor plan, shifts/pacing, reports
-- **Host** — reservation book, table status, waitlist, guestbook — no floor plan editing or shift/pacing config
+- **Manager** — everything except user management: floor plan, table combinations, shifts/pacing/turn times, reports
+- **Host** — reservation book (including the grid and table blocks), table status, waitlist, guestbook — no floor plan editing, combinations, or shift/pacing/turn-time config
 
 ## Tablet use
 

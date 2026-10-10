@@ -58,6 +58,7 @@ model User {
   updatedAt    DateTime @updatedAt
 
   createdReservations Reservation[] @relation("ReservationCreatedBy")
+  createdTableBlocks  TableBlock[]  @relation("TableBlockCreatedBy")
 
   @@map("users")
 }
@@ -96,6 +97,8 @@ model RestaurantTable {
 
   reservations     Reservation[]
   waitlistSeatings WaitlistEntry[]
+  combinations     TableCombination[] @relation("CombinationTables")
+  blocks           TableBlock[]
 
   @@map("restaurant_tables")
 }
@@ -145,6 +148,7 @@ model Shift {
   updatedAt    DateTime @updatedAt
 
   pacingRules  PacingRule[]
+  turnTimes    TurnTime[]
   reservations Reservation[]
 
   @@index([dayOfWeek])
@@ -166,6 +170,56 @@ model PacingRule {
   @@map("pacing_rules")
 }
 
+// How long a party occupies a table, by party size: "parties of up to `maxPartySize` take
+// `minutes`". Rules with a shiftId override the house defaults (shiftId null) for that shift — a
+// shift with any rules of its own uses only those. See server/src/lib/turnTimes.ts for the lookup.
+model TurnTime {
+  id           String   @id @default(uuid())
+  shiftId      String?
+  shift        Shift?   @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  maxPartySize Int
+  minutes      Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Postgres treats NULLs as distinct, so this only guards per-shift rules; the route enforces
+  // uniqueness for house defaults (shiftId null).
+  @@unique([shiftId, maxPartySize])
+  @@map("turn_times")
+}
+
+// A predefined set of tables pushed together for a large party (e.g. T4 + T5 seat 10). A
+// reservation assigned to a combination occupies every member table.
+model TableCombination {
+  id        String   @id @default(uuid())
+  capacity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tables       RestaurantTable[] @relation("CombinationTables")
+  reservations Reservation[]
+
+  @@map("table_combinations")
+}
+
+// A table held out of service for a time range (VIP hold, maintenance, private event). Blocks
+// conflict with reservations exactly like another booking would.
+model TableBlock {
+  id          String          @id @default(uuid())
+  tableId     String
+  table       RestaurantTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  startsAt    DateTime
+  endsAt      DateTime
+  reason      String?
+  createdById String?
+  createdBy   User?           @relation("TableBlockCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([tableId, startsAt])
+  @@map("table_blocks")
+}
+
 model Reservation {
   id        String            @id @default(uuid())
   guestId   String
@@ -175,6 +229,13 @@ model Reservation {
   status    ReservationStatus @default(BOOKED)
   tableId   String?
   table     RestaurantTable?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  // Set when the party is booked on a TableCombination; `tableId` then holds the combination's
+  // lowest-numbered table, so everything that shows "Table N" keeps working.
+  combinationId String?
+  combination   TableCombination? @relation(fields: [combinationId], references: [id], onDelete: SetNull)
+  // Host override of how long this party holds the table (e.g. resized on the grid view). Null
+  // means "use the TurnTime rule for this party size and shift".
+  durationMinutes Int?
   shiftId   String?
   shift     Shift?            @relation(fields: [shiftId], references: [id])
   // Per-visit occasion tags (e.g. "Anniversary", "Date Night") — separate from the guest-level
@@ -201,6 +262,7 @@ model Reservation {
   @@index([dateTime])
   @@index([tableId])
   @@index([guestId])
+  @@index([combinationId])
   @@map("reservations")
 }
 

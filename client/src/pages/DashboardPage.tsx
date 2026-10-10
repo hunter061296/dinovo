@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../lib/AuthContext";
 import { api } from "../lib/api";
 import type { Reservation } from "../lib/reservations";
-import { minutesToLabel, STATUS_STYLES, STATUS_LABELS } from "../lib/reservations";
+import { minutesToLabel, reservationTableLabel, STATUS_STYLES, STATUS_LABELS } from "../lib/reservations";
 import type { RestaurantTable } from "../lib/tables";
 import type { WaitlistEntry } from "../lib/waitlist";
 import { CurrentlySeatedPanel } from "../components/floorplan/CurrentlySeatedPanel";
@@ -136,7 +136,7 @@ export function DashboardPage() {
                       {r.guest.firstName} {r.guest.lastName} · {r.partySize}
                     </div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {r.table ? `Table ${r.table.number}` : "Unassigned"}
+                      {reservationTableLabel(r)}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence } from "motion/react";
-import { api } from "../../lib/api";
+import { api, apiErrorMessage } from "../../lib/api";
 import { formatElapsed } from "../../lib/elapsed";
 import type { SeatedSummaryEntry } from "../../lib/tables";
 import type { Reservation } from "../../lib/reservations";
-import { minutesToLabel } from "../../lib/reservations";
+import { minutesToLabel, reservationTableLabel } from "../../lib/reservations";
 import { minutesSince, type WaitlistEntry } from "../../lib/waitlist";
 import { SeatTableModal } from "../SeatTableModal";
 
@@ -137,22 +137,31 @@ export function FloorPlanSidePanel({ date, onOpenReservation }: Props) {
     queryClient.invalidateQueries({ queryKey: ["waitlist"] });
   };
 
+  // Picking a combination's own first table keeps the combination (the party still holds all
+  // of its tables); picking any other table moves the party to just that table.
+  const tableChoice = (r: Reservation, tableId: string) =>
+    r.combinationId && r.tableId === tableId ? {} : { tableId, combinationId: null };
+
   const seatReservation = useMutation({
-    mutationFn: ({ id, tableId }: { id: string; tableId: string }) =>
-      api.patch(`/reservations/${id}`, { status: "SEATED", tableId }),
+    mutationFn: ({ r, tableId }: { r: Reservation; tableId: string }) =>
+      api.patch(`/reservations/${r.id}`, { status: "SEATED", ...tableChoice(r, tableId) }),
     onSuccess: () => {
       invalidateAfterSeating();
       setSeatingReservation(null);
+      seatReservation.reset();
+      preAssignReservation.reset();
     },
   });
 
   // Assigns a table ahead of time without seating — the reservation stays BOOKED. The server's
   // own conflict check still blocks assigning a table that's genuinely double-booked.
   const preAssignReservation = useMutation({
-    mutationFn: ({ id, tableId }: { id: string; tableId: string }) => api.patch(`/reservations/${id}`, { tableId }),
+    mutationFn: ({ r, tableId }: { r: Reservation; tableId: string }) => api.patch(`/reservations/${r.id}`, tableChoice(r, tableId)),
     onSuccess: () => {
       invalidateAfterSeating();
       setSeatingReservation(null);
+      seatReservation.reset();
+      preAssignReservation.reset();
     },
   });
 
@@ -161,6 +170,7 @@ export function FloorPlanSidePanel({ date, onOpenReservation }: Props) {
     onSuccess: () => {
       invalidateAfterSeating();
       setSeatingWaitlistEntry(null);
+      seatWaitlistEntry.reset();
     },
   });
 
@@ -272,7 +282,7 @@ export function FloorPlanSidePanel({ date, onOpenReservation }: Props) {
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
                         {minutesToLabel(new Date(r.dateTime).getHours() * 60 + new Date(r.dateTime).getMinutes())} ·{" "}
-                        {r.table ? `Table ${r.table.number}` : "Unassigned"}
+                        {reservationTableLabel(r)}
                       </div>
                     </button>
                     {/* Assign/seat a table — a separate action from opening the reservation above. */}
@@ -356,9 +366,14 @@ export function FloorPlanSidePanel({ date, onOpenReservation }: Props) {
             partySize={seatingReservation.partySize}
             preferredTableId={seatingReservation.tableId}
             submitting={seatReservation.isPending || preAssignReservation.isPending}
-            onClose={() => setSeatingReservation(null)}
-            onSeat={(tableId) => seatReservation.mutate({ id: seatingReservation.id, tableId })}
-            onPreAssign={(tableId) => preAssignReservation.mutate({ id: seatingReservation.id, tableId })}
+            error={apiErrorMessage(seatReservation.error ?? preAssignReservation.error, "Couldn't update this reservation")}
+            onClose={() => {
+              setSeatingReservation(null);
+              seatReservation.reset();
+              preAssignReservation.reset();
+            }}
+            onSeat={(tableId) => seatReservation.mutate({ r: seatingReservation, tableId })}
+            onPreAssign={(tableId) => preAssignReservation.mutate({ r: seatingReservation, tableId })}
           />
         )}
 
@@ -369,7 +384,11 @@ export function FloorPlanSidePanel({ date, onOpenReservation }: Props) {
             subtitle={`Party of ${seatingWaitlistEntry.partySize} · choose an open table.`}
             partySize={seatingWaitlistEntry.partySize}
             submitting={seatWaitlistEntry.isPending}
-            onClose={() => setSeatingWaitlistEntry(null)}
+            error={apiErrorMessage(seatWaitlistEntry.error, "Couldn't seat this party")}
+            onClose={() => {
+              setSeatingWaitlistEntry(null);
+              seatWaitlistEntry.reset();
+            }}
             onSeat={(tableId) => seatWaitlistEntry.mutate({ id: seatingWaitlistEntry.id, tableId })}
           />
         )}

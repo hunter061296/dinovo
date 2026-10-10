@@ -7,6 +7,7 @@ import { getSocket } from "../lib/socket";
 import type { RestaurantTable, Section, TableShape } from "../lib/tables";
 import { TableFormModal } from "../components/floorplan/TableFormModal";
 import { SectionManagerModal } from "../components/floorplan/SectionManagerModal";
+import { CombinationManagerModal } from "../components/floorplan/CombinationManagerModal";
 import { FloorPlanCanvas } from "../components/floorplan/FloorPlanCanvas";
 
 export function FloorPlanSettingsPage() {
@@ -26,6 +27,7 @@ export function FloorPlanSettingsPage() {
   const [formModal, setFormModal] = useState<"add" | RestaurantTable | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [sectionManagerOpen, setSectionManagerOpen] = useState(false);
+  const [combinationsOpen, setCombinationsOpen] = useState(false);
 
   // Deep-link from the live Floor Plan's "Edit table layout" action (see FloorPlanPage) — opens
   // straight to that table's edit form instead of requiring a second click here.
@@ -106,12 +108,21 @@ export function FloorPlanSettingsPage() {
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Floor plan settings</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">Drag to reposition, or use Add table to edit the layout.</p>
         </div>
-        <button
-          onClick={() => setFormModal("add")}
-          className="rounded-md bg-accent-600 px-4 py-2 text-sm font-medium text-white hover:bg-accent-700"
-        >
-          Add table
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setCombinationsOpen(true)}
+            disabled={!tables}
+            className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            Combined tables
+          </button>
+          <button
+            onClick={() => setFormModal("add")}
+            className="rounded-md bg-accent-600 px-4 py-2 text-sm font-medium text-white hover:bg-accent-700"
+          >
+            Add table
+          </button>
+        </div>
       </div>
 
       {isLoading && <div className="shrink-0 text-sm text-gray-500 dark:text-gray-400">Loading floor plan...</div>}
@@ -159,6 +170,9 @@ export function FloorPlanSettingsPage() {
           />
         )}
 
+        {combinationsOpen && tables && (
+          <CombinationManagerModal key="combination-manager" tables={tables} onClose={() => setCombinationsOpen(false)} />
+        )}
         {sectionManagerOpen && <SectionManagerModal key="section-manager" sections={sections ?? []} onClose={() => setSectionManagerOpen(false)} />}
       </AnimatePresence>
     </div>

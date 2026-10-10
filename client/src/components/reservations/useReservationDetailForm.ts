@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
-import type { RestaurantTable } from "../../lib/tables";
 import type { Reservation, ReservationFormValues, ReservationStatus, Shift } from "../../lib/reservations";
 import type { GuestDetail } from "../../lib/guests";
-import { coversInSlot, findPacingRule } from "../../lib/pacing";
+import { coversInSlot, dayOfWeekFor, findPacingRule } from "../../lib/pacing";
 import type { NewGuestInput } from "./GuestPicker";
+import { decodeAssignment, encodeAssignment } from "../../lib/assignment";
 
 function toTimeInputValue(iso: string) {
   const d = new Date(iso);
@@ -28,7 +28,10 @@ export function useReservationDetailForm({ date, shifts, reservationsThatDay, in
   const [newGuest, setNewGuest] = useState<NewGuestInput | null>(null);
   const [partySize, setPartySize] = useState(initial?.partySize?.toString() ?? "2");
   const [time, setTime] = useState(initial ? toTimeInputValue(initial.dateTime) : "18:00");
-  const [tableId, setTableId] = useState<string>(initial?.tableId ?? "");
+  // Encoded table-or-combination choice — see TableAssignSelect.
+  const [assignment, setAssignment] = useState<string>(encodeAssignment(initial));
+  // "" = use the turn-time rule; otherwise the host's override in minutes.
+  const [durationMinutes, setDurationMinutes] = useState(initial?.durationMinutes?.toString() ?? "");
   const [status, setStatus] = useState<ReservationStatus>(initial?.status ?? "BOOKED");
   const [tags, setTags] = useState<string[]>(initial?.tags ?? []);
   const [newTag, setNewTag] = useState("");
@@ -39,11 +42,6 @@ export function useReservationDetailForm({ date, shifts, reservationsThatDay, in
   const [excludeFromPacing, setExcludeFromPacing] = useState(initial?.excludeFromPacing ?? false);
   const [notified, setNotified] = useState(false);
   const [notifying, setNotifying] = useState(false);
-
-  const { data: tables } = useQuery<RestaurantTable[]>({
-    queryKey: ["tables"],
-    queryFn: () => api.get("/tables").then((res) => res.data),
-  });
 
   // Feeds the mini guest-stats block — the embedded `guest` on a Reservation doesn't include this
   // guest's other reservations, so a dedicated fetch is needed for "Upcoming".
@@ -61,7 +59,7 @@ export function useReservationDetailForm({ date, shifts, reservationsThatDay, in
     const [hours, minutes] = time.split(":").map(Number);
     if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
     const slot = hours * 60 + minutes - ((hours * 60 + minutes) % 30);
-    const rule = findPacingRule(shifts, slot);
+    const rule = findPacingRule(shifts, slot, dayOfWeekFor(date));
     if (!rule) return null;
 
     const size = Number(partySize) || 0;
@@ -77,7 +75,7 @@ export function useReservationDetailForm({ date, shifts, reservationsThatDay, in
       messages.push(`Party size ${size} exceeds this slot's max of ${rule.maxPartySize}.`);
     }
     return messages.length > 0 ? messages.join(" ") : null;
-  }, [time, partySize, shifts, reservationsThatDay, initial?.id, excludeFromPacing]);
+  }, [time, partySize, shifts, date, reservationsThatDay, initial?.id, excludeFromPacing]);
 
   function toggleTag(tag: string) {
     setTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
@@ -111,7 +109,8 @@ export function useReservationDetailForm({ date, shifts, reservationsThatDay, in
       newGuest: newGuest ?? undefined,
       partySize: Number(partySize),
       dateTime: dateTime.toISOString(),
-      tableId: tableId || null,
+      ...decodeAssignment(assignment),
+      durationMinutes: durationMinutes === "" ? null : Number(durationMinutes),
       tags,
       generalNote,
       offerNote,
@@ -133,8 +132,10 @@ export function useReservationDetailForm({ date, shifts, reservationsThatDay, in
     setPartySize,
     time,
     setTime,
-    tableId,
-    setTableId,
+    assignment,
+    setAssignment,
+    durationMinutes,
+    setDurationMinutes,
     status,
     setStatus,
     tags,
@@ -155,7 +156,6 @@ export function useReservationDetailForm({ date, shifts, reservationsThatDay, in
     notified,
     notifying,
     handleNotify,
-    tables,
     guestDetail,
     upcomingCount,
     pacingWarning,

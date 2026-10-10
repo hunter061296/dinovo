@@ -1,52 +1,107 @@
 import { ReservationStatus } from "@prisma/client";
 import { prisma } from "./prisma";
+import { formatZonedTime } from "./time";
+import { loadTurnTimes, maxTurnMinutes, reservationDuration } from "./turnTimes";
 
-// A table physically can't seat two parties at once. There's no per-table turn-time setting to
-// derive this from (PacingRule.timeSlotMinutes is a 30-minute booking-cadence bucket, not how
-// long a party actually occupies a table), so assume a flat 90-minute occupancy window around
-// each reservation's dateTime — long enough to cover a typical seating through bussing.
-export const TABLE_OVERLAP_MINUTES = 90;
+// A table physically can't seat two parties at once. Each reservation holds its table(s) for
+// [dateTime, dateTime + duration), where duration is the reservation's own override or the
+// TurnTime rule for its party size and shift (lib/turnTimes.ts). Table blocks hold a table for
+// their own [startsAt, endsAt).
 
 // A cancelled/no-show/completed reservation has freed the table, so it can't conflict.
 const OCCUPYING_STATUSES: ReservationStatus[] = ["BOOKED", "SEATED"];
 
-export interface TableConflict {
-  id: string;
-  dateTime: Date;
-  guestName: string;
+const MINUTE_MS = 60_000;
+
+// Upper bound on a host's per-reservation duration override (validated in the reservations
+// route), so the conflict lookback below covers overridden reservations too.
+export const MAX_DURATION_MINUTES = 8 * 60;
+
+// Every table a reservation occupies: all members of its combination, or just its table.
+export function occupiedTableIds(r: { tableId: string | null; combination?: { tables: { id: string }[] } | null }): string[] {
+  if (r.combination) return r.combination.tables.map((t) => t.id);
+  return r.tableId ? [r.tableId] : [];
 }
 
-function formatTime(d: Date): string {
-  const h24 = d.getHours();
-  const m = d.getMinutes();
-  const period = h24 >= 12 ? "PM" : "AM";
-  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
-  return `${h12}:${m.toString().padStart(2, "0")} ${period}`;
+export type TableConflict =
+  | { kind: "reservation"; id: string; dateTime: Date; guestName: string; tableNumber: number }
+  | { kind: "block"; id: string; startsAt: Date; endsAt: Date; reason: string | null; tableNumber: number };
+
+export function intervalsOverlap(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
+  return aStart < bEnd && bStart < aEnd;
 }
 
-export async function findConflictingReservation(params: {
-  tableId: string;
-  dateTime: Date;
-  excludeId?: string;
+export async function findConflict(params: {
+  tableIds: string[];
+  start: Date;
+  durationMinutes: number;
+  excludeReservationId?: string;
+  // Skips the block check entirely — used when creating a block, where overlapping another
+  // block is harmless (both just say "not available").
+  ignoreBlocks?: boolean;
 }): Promise<TableConflict | null> {
-  const { tableId, dateTime, excludeId } = params;
-  const windowMs = TABLE_OVERLAP_MINUTES * 60 * 1000;
+  const { tableIds, start, durationMinutes, excludeReservationId, ignoreBlocks } = params;
+  if (tableIds.length === 0) return null;
 
-  const conflict = await prisma.reservation.findFirst({
-    where: {
-      tableId,
-      status: { in: OCCUPYING_STATUSES },
-      dateTime: { gt: new Date(dateTime.getTime() - windowMs), lt: new Date(dateTime.getTime() + windowMs) },
-      ...(excludeId ? { id: { not: excludeId } } : {}),
-    },
-    include: { guest: true },
-    orderBy: { dateTime: "asc" },
-  });
-  if (!conflict) return null;
+  const startMs = start.getTime();
+  const endMs = startMs + durationMinutes * MINUTE_MS;
+  const rules = await loadTurnTimes();
+  // A reservation that started up to the longest possible hold ago could still be at the table.
+  const lookbackMs = Math.max(maxTurnMinutes(rules), MAX_DURATION_MINUTES) * MINUTE_MS;
 
-  return { id: conflict.id, dateTime: conflict.dateTime, guestName: `${conflict.guest.firstName} ${conflict.guest.lastName}` };
+  const [candidates, blocks] = await Promise.all([
+    prisma.reservation.findMany({
+      where: {
+        status: { in: OCCUPYING_STATUSES },
+        dateTime: { gt: new Date(startMs - lookbackMs), lt: new Date(endMs) },
+        OR: [{ tableId: { in: tableIds } }, { combination: { tables: { some: { id: { in: tableIds } } } } }],
+        ...(excludeReservationId ? { id: { not: excludeReservationId } } : {}),
+      },
+      include: { guest: true, table: true, combination: { include: { tables: true } } },
+      orderBy: { dateTime: "asc" },
+    }),
+    ignoreBlocks
+      ? Promise.resolve([])
+      : prisma.tableBlock.findMany({
+          where: { tableId: { in: tableIds }, startsAt: { lt: new Date(endMs) }, endsAt: { gt: start } },
+          include: { table: true },
+          orderBy: { startsAt: "asc" },
+        }),
+  ]);
+
+  for (const r of candidates) {
+    const rStart = r.dateTime.getTime();
+    const rEnd = rStart + reservationDuration(rules, r) * MINUTE_MS;
+    if (!intervalsOverlap(startMs, endMs, rStart, rEnd)) continue;
+    // Name the table actually shared, which for a combination may not be its primary table.
+    const shared = r.combination?.tables.find((t) => tableIds.includes(t.id)) ?? r.table;
+    return {
+      kind: "reservation",
+      id: r.id,
+      dateTime: r.dateTime,
+      guestName: `${r.guest.firstName} ${r.guest.lastName}`,
+      tableNumber: shared?.number ?? 0,
+    };
+  }
+
+  const block = blocks[0];
+  if (block) {
+    return {
+      kind: "block",
+      id: block.id,
+      startsAt: block.startsAt,
+      endsAt: block.endsAt,
+      reason: block.reason,
+      tableNumber: block.table.number,
+    };
+  }
+  return null;
 }
 
 export function conflictMessage(conflict: TableConflict): string {
-  return `This table is already booked for ${conflict.guestName} at ${formatTime(conflict.dateTime)} — within ${TABLE_OVERLAP_MINUTES} minutes of this reservation.`;
+  if (conflict.kind === "block") {
+    const why = conflict.reason ? ` (${conflict.reason})` : "";
+    return `Table ${conflict.tableNumber} is blocked ${formatZonedTime(conflict.startsAt)} – ${formatZonedTime(conflict.endsAt)}${why}.`;
+  }
+  return `Table ${conflict.tableNumber} is already booked for ${conflict.guestName} at ${formatZonedTime(conflict.dateTime)}, and the two parties' table times overlap.`;
 }

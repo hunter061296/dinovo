@@ -1,5 +1,6 @@
 import { PrismaClient, TableShape, ReservationStatus } from "@prisma/client";
 import bcrypt from "bcrypt";
+import { addDaysToISODate, dayOfWeekForISODate, todayISODate, zonedDateTime } from "../src/lib/time";
 
 // Minutes-from-midnight helpers keep the pacing/shift math in Phase 8 simple integer arithmetic.
 const mins = (h: number, m = 0) => h * 60 + m;
@@ -10,6 +11,9 @@ export async function seedDatabase(prisma: PrismaClient) {
   console.log("Clearing existing data...");
   await prisma.reservation.deleteMany();
   await prisma.waitlistEntry.deleteMany();
+  await prisma.tableBlock.deleteMany();
+  await prisma.tableCombination.deleteMany();
+  await prisma.turnTime.deleteMany();
   await prisma.pacingRule.deleteMany();
   await prisma.shift.deleteMany();
   await prisma.guest.deleteMany();
@@ -71,6 +75,16 @@ export async function seedDatabase(prisma: PrismaClient) {
     )
   );
 
+  // ---------- Table combinations (pushed-together tables for big parties) ----------
+  console.log("Seeding table combinations...");
+  const byNumber = (n: number) => tables.find((t) => t.number === n)!;
+  await prisma.tableCombination.create({
+    data: { capacity: 8, tables: { connect: [{ id: byNumber(4).id }, { id: byNumber(5).id }] } },
+  });
+  await prisma.tableCombination.create({
+    data: { capacity: 12, tables: { connect: [{ id: byNumber(8).id }, { id: byNumber(9).id }] } },
+  });
+
   // ---------- Guests (19 profiles, varied visit history/tags) ----------
   // `autoTags` here mirrors what server/src/lib/guestTags.ts would compute (visitCount >= 5 =>
   // "Regular", 60+ days since last completed visit + previously-Regular-or-visitCount >= 3 =>
@@ -108,11 +122,29 @@ export async function seedDatabase(prisma: PrismaClient) {
 
   // ---------- Shifts ----------
   console.log("Seeding shifts...");
+  // "Today" is the restaurant's calendar day (RESTAURANT_TIMEZONE, see src/lib/time.ts), so a
+  // server running in UTC still seeds a sensible local lunch and dinner.
+  const todayISO = todayISODate();
+  const todayDayOfWeek = dayOfWeekForISODate(todayISO);
   const lunch = await prisma.shift.create({
-    data: { name: "Lunch", dayOfWeek: new Date().getDay(), startMinutes: mins(11), endMinutes: mins(15) },
+    data: { name: "Lunch", dayOfWeek: todayDayOfWeek, startMinutes: mins(11), endMinutes: mins(15) },
   });
   const dinner = await prisma.shift.create({
-    data: { name: "Dinner", dayOfWeek: new Date().getDay(), startMinutes: mins(17), endMinutes: mins(22) },
+    data: { name: "Dinner", dayOfWeek: todayDayOfWeek, startMinutes: mins(17), endMinutes: mins(22) },
+  });
+
+  // ---------- Turn times (house defaults by party size, plus a faster lunch) ----------
+  console.log("Seeding turn times...");
+  await prisma.turnTime.createMany({
+    data: [
+      { shiftId: null, maxPartySize: 2, minutes: 75 },
+      { shiftId: null, maxPartySize: 4, minutes: 90 },
+      { shiftId: null, maxPartySize: 6, minutes: 105 },
+      { shiftId: null, maxPartySize: 12, minutes: 120 },
+      { shiftId: lunch.id, maxPartySize: 2, minutes: 50 },
+      { shiftId: lunch.id, maxPartySize: 4, minutes: 60 },
+      { shiftId: lunch.id, maxPartySize: 12, minutes: 75 },
+    ],
   });
 
   // ---------- Pacing rules (30-min slots, sensible cover/party caps) ----------
@@ -138,9 +170,7 @@ export async function seedDatabase(prisma: PrismaClient) {
 
   // ---------- Reservations (a day's worth across lunch + dinner) ----------
   console.log("Seeding reservations...");
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const at = (h: number, m = 0) => new Date(today.getTime() + (h * 60 + m) * 60_000);
+  const at = (h: number, m = 0) => zonedDateTime(todayISO, h * 60 + m);
 
   const statusCycle: ReservationStatus[] = ["BOOKED", "SEATED", "COMPLETED", "BOOKED", "CANCELLED", "NO_SHOW", "BOOKED", "COMPLETED"];
 
@@ -231,7 +261,7 @@ export async function seedDatabase(prisma: PrismaClient) {
   // An old completed visit for the "Lapsing" demo guest (Grace Lee) — dated well past the
   // 60-day threshold, separate from the "today" reservations above.
   const lapsingGuest = guests.find((g) => g.email === "grace.lee@example.com")!;
-  const lapsingVisitTime = new Date(today.getTime() - 75 * 24 * 60 * 60 * 1000 + mins(19) * 60_000);
+  const lapsingVisitTime = zonedDateTime(addDaysToISODate(todayISO, -75), mins(19));
   const lapsingSeatedAt = new Date(lapsingVisitTime.getTime() + 5 * 60_000);
   await prisma.reservation.create({
     data: {
@@ -253,12 +283,17 @@ export async function seedDatabase(prisma: PrismaClient) {
     data: [20, 40].map((daysAgo) => ({
       guestId: noShowGuest.id,
       partySize: 2,
-      dateTime: new Date(today.getTime() - daysAgo * 24 * 60 * 60 * 1000 + mins(19) * 60_000),
+      dateTime: zonedDateTime(addDaysToISODate(todayISO, -daysAgo), mins(19)),
       status: "NO_SHOW" as ReservationStatus,
       tableId: null,
       shiftId: dinner.id,
       createdById: host.id,
     })),
+  });
+
+  // ---------- Table block (a VIP hold on the bar's table 2 through early dinner) ----------
+  await prisma.tableBlock.create({
+    data: { tableId: byNumber(2).id, startsAt: at(17), endsAt: at(19), reason: "Held for VIP", createdById: admin.id },
   });
 
   // ---------- Waitlist (a couple of active walk-ins) ----------

@@ -1,14 +1,15 @@
 import { ReservationStatus } from "@prisma/client";
 import { prisma } from "./prisma";
+import { toZonedISODate, zonedDayBounds, zonedParts } from "./time";
 
 // A cancelled or no-show reservation never occupied a seat, so it shouldn't count against the cap.
 // Mirrors client/src/lib/pacing.ts's COUNTED_STATUSES.
 const COUNTED_STATUSES: ReservationStatus[] = ["BOOKED", "SEATED", "COMPLETED"];
 const SLOT_MINUTES = 30;
 
-// Mirrors client/src/lib/pacing.ts's slotMinutesFor.
+// Mirrors client/src/lib/pacing.ts's slotMinutesFor, in the restaurant's timezone.
 export function slotMinutesFor(dateTime: Date, slotSize = SLOT_MINUTES): number {
-  const minutes = dateTime.getHours() * 60 + dateTime.getMinutes();
+  const minutes = zonedParts(dateTime).minutesOfDay;
   return minutes - (minutes % slotSize);
 }
 
@@ -41,9 +42,7 @@ export async function checkPacingCap(params: {
   const messages: string[] = [];
 
   if (!excludeFromPacing) {
-    const dayStart = new Date(dateTime);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+    const { start: dayStart, end: dayEnd } = zonedDayBounds(toZonedISODate(dateTime));
 
     const sameDayReservations = await prisma.reservation.findMany({
       where: {

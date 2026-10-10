@@ -60,7 +60,7 @@ router.get("/:id", async (req, res) => {
     where: { id: req.params.id },
     include: {
       reservations: {
-        include: { table: true },
+        include: { table: true, combination: { include: { tables: { orderBy: { number: "asc" } } } } },
         orderBy: { dateTime: "desc" },
       },
     },

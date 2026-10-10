@@ -5,6 +5,8 @@ import { prisma } from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
 import { getIO } from "../lib/socket";
 import { estimateWaitMinutes } from "../lib/waitEstimate";
+import { findShiftForDateTime } from "../lib/shiftMatch";
+import { loadTurnTimes, resolveTurnMinutes } from "../lib/turnTimes";
 
 const router = Router();
 
@@ -32,11 +34,22 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: parsed.error.issues[0].message });
   }
 
-  const [tables, waiting] = await Promise.all([
+  const now = new Date();
+  const [tables, waiting, rules, shift, activeBlocks] = await Promise.all([
     prisma.restaurantTable.findMany(),
     prisma.waitlistEntry.findMany({ where: { status: "WAITING" }, orderBy: { addedAt: "asc" } }),
+    loadTurnTimes(),
+    findShiftForDateTime(now),
+    prisma.tableBlock.findMany({ where: { startsAt: { lte: now }, endsAt: { gt: now } } }),
   ]);
-  const quotedWaitMinutes = estimateWaitMinutes(parsed.data.partySize, tables, waiting);
+  const quotedWaitMinutes = estimateWaitMinutes({
+    partySize: parsed.data.partySize,
+    tables,
+    waitingAhead: waiting,
+    turnMinutes: (size) => resolveTurnMinutes(rules, size, shift?.id),
+    activeBlocks,
+    now,
+  });
 
   const entry = await prisma.waitlistEntry.create({
     data: { ...parsed.data, quotedWaitMinutes },
@@ -69,25 +82,58 @@ router.post("/:id/seat", async (req, res) => {
     return res.status(400).json({ error: parsed.error.issues[0].message });
   }
 
-  const table = await prisma.restaurantTable.findUnique({ where: { id: parsed.data.tableId } });
+  const [existing, table] = await Promise.all([
+    prisma.waitlistEntry.findUnique({ where: { id: req.params.id } }),
+    prisma.restaurantTable.findUnique({ where: { id: parsed.data.tableId } }),
+  ]);
+  if (!existing) {
+    return res.status(404).json({ error: "Waitlist entry not found" });
+  }
+  if (existing.status !== "WAITING") {
+    return res.status(409).json({ error: `${existing.guestName} is no longer waiting` });
+  }
   if (!table) {
     return res.status(404).json({ error: "Table not found" });
   }
-  if (table.status !== "OPEN") {
-    return res.status(409).json({ error: `Table ${table.number} is not open` });
+
+  const now = new Date();
+  const block = await prisma.tableBlock.findFirst({ where: { tableId: table.id, startsAt: { lte: now }, endsAt: { gt: now } } });
+  if (block) {
+    return res.status(409).json({ error: `Table ${table.number} is blocked right now${block.reason ? ` (${block.reason})` : ""}` });
   }
 
-  const [entry, updatedTable] = await prisma.$transaction([
-    prisma.waitlistEntry.update({
-      where: { id: req.params.id },
-      data: { status: "SEATED", seatedAt: new Date(), seatedTableId: table.id },
-    }),
-    prisma.restaurantTable.update({ where: { id: table.id }, data: { status: "SEATED", statusUpdatedAt: new Date() } }),
-  ]);
+  // Both writes are conditional on the state just checked, inside one transaction, so two hosts
+  // seating at the same moment can't both win the same table (or seat the same party twice).
+  const result = await prisma.$transaction(async (tx) => {
+    const claimed = await tx.restaurantTable.updateMany({
+      where: { id: table.id, status: "OPEN" },
+      data: { status: "SEATED", statusUpdatedAt: now },
+    });
+    if (claimed.count === 0) return { error: `Table ${table.number} is not open` } as const;
+    const seated = await tx.waitlistEntry.updateMany({
+      where: { id: existing.id, status: "WAITING" },
+      data: { status: "SEATED", seatedAt: now, seatedTableId: table.id },
+    });
+    if (seated.count === 0) throw new SeatConflict(`${existing.guestName} is no longer waiting`);
+    const entry = await tx.waitlistEntry.findUniqueOrThrow({ where: { id: existing.id } });
+    const updatedTable = await tx.restaurantTable.findUniqueOrThrow({ where: { id: table.id } });
+    return { entry, updatedTable } as const;
+  }).catch((err) => {
+    if (err instanceof SeatConflict) return { error: err.message } as const;
+    throw err;
+  });
+  if ("error" in result) {
+    return res.status(409).json({ error: result.error });
+  }
+  const { entry, updatedTable } = result;
 
   getIO().emit("waitlist:updated", entry);
   getIO().emit("table:updated", updatedTable);
   res.json(entry);
 });
+
+// Thrown inside the seat transaction to roll back the table claim when the party was seated
+// elsewhere in the meantime.
+class SeatConflict extends Error {}
 
 export default router;

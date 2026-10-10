@@ -1,0 +1,7 @@
+{
+  // Typechecks the tests alongside the source (vitest itself only strips types). Not used for
+  // the build — tsconfig.json still compiles src/ alone into dist/.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "rootDir": "." },
+  "include": ["src", "test", "prisma", "vitest.config.ts"]
+}

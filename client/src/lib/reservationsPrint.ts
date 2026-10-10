@@ -1,5 +1,5 @@
 import type { Reservation } from "./reservations";
-import { minutesToLabel } from "./reservations";
+import { minutesToLabel, reservationTableLabel } from "./reservations";
 import { TABLE_STATUS_LABELS } from "./tables";
 
 export interface PrintRow {
@@ -30,7 +30,7 @@ export function toPrintRow(r: Reservation): PrintRow {
     time: minutesToLabel(dt.getHours() * 60 + dt.getMinutes()),
     partySize: r.partySize.toString(),
     guestName: `${r.guest.firstName} ${r.guest.lastName}`,
-    table: r.table ? `Table ${r.table.number}` : "Unassigned",
+    table: reservationTableLabel(r),
     notesAndTags: notesAndTags || "—",
     tableStatus: r.table ? TABLE_STATUS_LABELS[r.table.status] : "—",
     // "Made" = when the reservation was booked (createdAt), not the reservation's own date/time.

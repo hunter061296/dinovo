@@ -1,21 +1,25 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { AnimatePresence } from "motion/react";
 import { api } from "../lib/api";
 import type { Shift } from "../lib/reservations";
-import { STATUS_LABELS, STATUS_STYLES, minutesToLabel } from "../lib/reservations";
+import { STATUS_LABELS, STATUS_STYLES, minutesToLabel, reservationTableLabel } from "../lib/reservations";
 import type { Reservation } from "../lib/reservations";
-import { coversInSlot, findPacingRule } from "../lib/pacing";
+import { coversInSlot, dayOfWeekFor, findPacingRule } from "../lib/pacing";
 import { ReservationFormModal, type ReservationFormValues } from "../components/reservations/ReservationFormModal";
 import { ReservationWizardModal } from "../components/reservations/ReservationWizardModal";
 import { DateSwitcher, todayLocalISODate } from "../components/DateSwitcher";
+import { ReservationGrid } from "../components/reservations/ReservationGrid";
 
 const SLOT_MINUTES = 30;
 
 export function ReservationsPage() {
   const queryClient = useQueryClient();
   const [date, setDate] = useState(todayLocalISODate());
+  // In the URL so a host can bookmark/refresh straight into the grid.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view = searchParams.get("view") === "grid" ? "grid" : "list";
   const [modal, setModal] = useState<"add" | Reservation | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -42,14 +46,26 @@ export function ReservationsPage() {
   const isLoading = shiftsLoading || reservationsLoading;
   const isError = shiftsError || reservationsError;
 
+  const dayOfWeek = dayOfWeekFor(date);
+  // Only this weekday's shifts frame the day — another day's later dinner shouldn't stretch it.
+  const shiftsThatDay = useMemo(() => (shifts ?? []).filter((s) => s.dayOfWeek === dayOfWeek), [shifts, dayOfWeek]);
+
   const slots = useMemo(() => {
-    if (!shifts || shifts.length === 0) return [];
-    const start = Math.min(...shifts.map((s) => s.startMinutes));
-    const end = Math.max(...shifts.map((s) => s.endMinutes));
+    if (shiftsThatDay.length === 0) return [];
+    let start = Math.min(...shiftsThatDay.map((s) => s.startMinutes));
+    let end = Math.max(...shiftsThatDay.map((s) => s.endMinutes));
+    // Widen to any reservation booked outside shift hours (a late seating, an early private
+    // party) — otherwise it would have no slot and silently vanish from the book.
+    for (const r of reservations ?? []) {
+      const d = new Date(r.dateTime);
+      const minutes = d.getHours() * 60 + d.getMinutes();
+      start = Math.min(start, minutes - (minutes % SLOT_MINUTES));
+      end = Math.max(end, minutes - (minutes % SLOT_MINUTES) + SLOT_MINUTES);
+    }
     const result: number[] = [];
     for (let m = start; m < end; m += SLOT_MINUTES) result.push(m);
     return result;
-  }, [shifts]);
+  }, [shiftsThatDay, reservations]);
 
   const reservationsBySlot = useMemo(() => {
     const map = new Map<number, Reservation[]>();
@@ -89,9 +105,27 @@ export function ReservationsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Reservation Book</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Day view across all shifts.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {view === "grid" ? "Every table across the day — drag to move parties." : "Day view across all shifts."}
+          </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div role="group" aria-label="View" className="flex overflow-hidden rounded-md border border-gray-300 text-sm dark:border-gray-600">
+            {(["list", "grid"] as const).map((v) => (
+              <button
+                key={v}
+                aria-pressed={view === v}
+                onClick={() => setSearchParams(v === "grid" ? { view: "grid" } : {}, { replace: true })}
+                className={`px-3 py-1.5 font-medium ${
+                  view === v
+                    ? "bg-accent-600 text-white"
+                    : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                }`}
+              >
+                {v === "list" ? "List" : "Grid"}
+              </button>
+            ))}
+          </div>
           <DateSwitcher date={date} onChange={setDate} />
           <Link
             to={`/reservations/print?date=${date}`}
@@ -110,15 +144,21 @@ export function ReservationsPage() {
 
       {isLoading && <div className="text-sm text-gray-500 dark:text-gray-400">Loading reservations...</div>}
       {isError && <div className="text-sm text-red-600 dark:text-red-400">Failed to load reservations.</div>}
-      {!isLoading && !isError && shifts && shifts.length === 0 && (
-        <div className="text-sm text-gray-500 dark:text-gray-400">No shifts are configured yet, so there's no timeline to show.</div>
+      {!isLoading && !isError && view === "grid" && (
+        <ReservationGrid date={date} reservations={reservations ?? []} shifts={shifts ?? []} onOpenReservation={setModal} />
       )}
 
-      {!isLoading && !isError && slots.length > 0 && (
+      {!isLoading && !isError && view === "list" && shifts && shiftsThatDay.length === 0 && (
+        <div className="text-sm text-gray-500 dark:text-gray-400">
+          No shifts are configured for this day, so there's no timeline to show — try the Grid view, or add a shift under Shifts &amp; Pacing.
+        </div>
+      )}
+
+      {!isLoading && !isError && view === "list" && slots.length > 0 && (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
           {slots.map((slot) => {
             const items = reservationsBySlot.get(slot) ?? [];
-            const rule = shifts ? findPacingRule(shifts, slot) : undefined;
+            const rule = shifts ? findPacingRule(shifts, slot, dayOfWeek) : undefined;
             const covers = reservations ? coversInSlot(reservations, slot) : 0;
             const overCap = rule && covers > rule.maxCovers;
             return (
@@ -148,7 +188,7 @@ export function ReservationsPage() {
                           {r.guest.firstName} {r.guest.lastName} · {r.partySize}
                         </div>
                         <div className="opacity-75">
-                          {r.table ? `Table ${r.table.number}` : "Unassigned"} · {STATUS_LABELS[r.status]}
+                          {reservationTableLabel(r)} · {STATUS_LABELS[r.status]}
                         </div>
                       </button>
                     ))
