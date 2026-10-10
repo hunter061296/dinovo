@@ -5,14 +5,53 @@ import { AnimatePresence } from "motion/react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
 import { getSocket } from "../lib/socket";
+import { wasTableSelfUpdated } from "../lib/selfUpdatedTables";
 import type { RestaurantTable, Section, SeatedSummaryEntry } from "../lib/tables";
 import type { Reservation, ReservationFormValues, Shift } from "../lib/reservations";
 import { minutesToLabel } from "../lib/reservations";
 import { TableStatusPopover } from "../components/floorplan/TableStatusPopover";
 import { FloorPlanSidePanel } from "../components/floorplan/FloorPlanSidePanel";
+import { Skeleton } from "../components/Skeleton";
 import { FloorPlanCanvas } from "../components/floorplan/FloorPlanCanvas";
 import { FloorPlanReservationPanel } from "../components/floorplan/FloorPlanReservationPanel";
 import { DateSwitcher, todayLocalISODate } from "../components/DateSwitcher";
+
+// Mirrors the real layout's side panel (tabs + a few rows) and canvas (a scatter of round/square
+// table outlines) so the page reads as "already rendering" rather than blank-then-pop.
+function FloorPlanSkeleton() {
+  return (
+    <div className="flex flex-col gap-4 sm:flex-row">
+      <div className="w-full shrink-0 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800 sm:w-72">
+        <div className="mb-3 flex gap-2">
+          <Skeleton className="h-6 flex-1" />
+          <Skeleton className="h-6 flex-1" />
+          <Skeleton className="h-6 flex-1" />
+        </div>
+        <div className="flex flex-col gap-3">
+          {Array.from({ length: 4 }, (_, i) => (
+            <Skeleton key={i} className="h-10 w-full" />
+          ))}
+        </div>
+      </div>
+      <div className="flex-1 rounded-lg border border-gray-200 bg-gray-50 p-5 dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex flex-wrap gap-6">
+          {[
+            "h-16 w-16 rounded-full",
+            "h-16 w-16 rounded-full",
+            "h-16 w-20 rounded-lg",
+            "h-16 w-16 rounded-full",
+            "h-16 w-24 rounded-lg",
+            "h-16 w-16 rounded-full",
+            "h-16 w-20 rounded-lg",
+            "h-16 w-16 rounded-full",
+          ].map((shape, i) => (
+            <Skeleton key={i} className={shape} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function FloorPlanPage() {
   const { user } = useAuth();
@@ -88,6 +127,10 @@ export function FloorPlanPage() {
     });
   }
 
+  // Briefly highlighted tables — a table:updated arrived for them from somewhere other than this
+  // screen's own action, so a host looking at the floor plan notices something just changed.
+  const [remoteHighlights, setRemoteHighlights] = useState<Set<string>>(new Set());
+
   // Keeps every open host-stand screen in sync — a status change made on one iPad shows up
   // on all the others without anyone refreshing.
   useEffect(() => {
@@ -103,12 +146,26 @@ export function FloorPlanPage() {
     const remove = ({ id }: { id: string }) => {
       queryClient.setQueryData<RestaurantTable[]>(["tables"], (old) => old?.filter((t) => t.id !== id));
     };
+    const remoteUpdate = (table: RestaurantTable) => {
+      upsert(table);
+      if (wasTableSelfUpdated(table.id)) return;
+      setRemoteHighlights((prev) => new Set(prev).add(table.id));
+      setTimeout(() => {
+        setRemoteHighlights((prev) => {
+          if (!prev.has(table.id)) return prev;
+          const next = new Set(prev);
+          next.delete(table.id);
+          return next;
+        });
+      }, 600);
+    };
+    // A brand-new table has nothing local to compare against — never highlight table:created.
     socket.on("table:created", upsert);
-    socket.on("table:updated", upsert);
+    socket.on("table:updated", remoteUpdate);
     socket.on("table:deleted", remove);
     return () => {
       socket.off("table:created", upsert);
-      socket.off("table:updated", upsert);
+      socket.off("table:updated", remoteUpdate);
       socket.off("table:deleted", remove);
     };
   }, [queryClient]);
@@ -134,7 +191,7 @@ export function FloorPlanPage() {
         )}
       </div>
 
-      {isLoading && <div className="shrink-0 text-sm text-gray-500 dark:text-gray-400">Loading floor plan...</div>}
+      {isLoading && <FloorPlanSkeleton />}
       {isError && <div className="shrink-0 text-sm text-red-600 dark:text-red-400">Failed to load the floor plan.</div>}
 
       {tables && (
@@ -167,6 +224,7 @@ export function FloorPlanPage() {
               onTableClick={setStatusTable}
               seatedGuestByTable={seatedGuestByTable}
               upcomingByTable={upcomingByTable}
+              remoteHighlights={remoteHighlights}
               emptyMessageNoTables={
                 canEditLayout ? 'No tables yet. Use "Edit layout" to build your floor plan.' : "No tables yet."
               }

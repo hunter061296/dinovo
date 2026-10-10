@@ -1,10 +1,30 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AnimatePresence } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { api } from "../lib/api";
 import { getSocket } from "../lib/socket";
 import { minutesSince, type WaitlistEntry } from "../lib/waitlist";
 import { SeatTableModal } from "../components/SeatTableModal";
+import { Skeleton } from "../components/Skeleton";
+import { DURATION, useMotionDuration } from "../lib/motion";
+import { listRowVariants } from "../lib/listMotion";
+import { markTableSelfUpdated } from "../lib/selfUpdatedTables";
+import { markWaitlistEntrySelfUpdated } from "../lib/selfInitiated";
+
+function WaitlistRowSkeleton() {
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <div className="flex flex-col gap-1.5">
+        <Skeleton className="h-4 w-40" />
+        <Skeleton className="h-3 w-56" />
+      </div>
+      <div className="flex shrink-0 gap-2">
+        <Skeleton className="h-7 w-20" />
+        <Skeleton className="h-7 w-16" />
+      </div>
+    </div>
+  );
+}
 
 export function WaitlistPage() {
   const queryClient = useQueryClient();
@@ -12,6 +32,7 @@ export function WaitlistPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [seating, setSeating] = useState<WaitlistEntry | null>(null);
   const [lastQuote, setLastQuote] = useState<number | null>(null);
+  const rowDuration = useMotionDuration(DURATION.fast);
 
   // Forces a re-render every 30s so "waiting X min" stays roughly live without polling the server.
   const [, setTick] = useState(0);
@@ -49,12 +70,19 @@ export function WaitlistPage() {
   });
 
   const cancelEntry = useMutation({
-    mutationFn: (id: string) => api.patch(`/waitlist/${id}`, { status: "CANCELLED" }),
+    mutationFn: (id: string) => {
+      markWaitlistEntrySelfUpdated(id);
+      return api.patch(`/waitlist/${id}`, { status: "CANCELLED" });
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["waitlist"] }),
   });
 
   const seatEntry = useMutation({
-    mutationFn: ({ id, tableId }: { id: string; tableId: string }) => api.post(`/waitlist/${id}/seat`, { tableId }),
+    mutationFn: ({ id, tableId }: { id: string; tableId: string }) => {
+      markWaitlistEntrySelfUpdated(id);
+      markTableSelfUpdated(tableId);
+      return api.post(`/waitlist/${id}/seat`, { tableId });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["waitlist"] });
       queryClient.invalidateQueries({ queryKey: ["tables"] });
@@ -115,7 +143,13 @@ export function WaitlistPage() {
         </button>
       </form>
 
-      {isLoading && <div className="text-sm text-gray-500 dark:text-gray-400">Loading waitlist...</div>}
+      {isLoading && (
+        <div className="divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-200 bg-white dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-800">
+          {Array.from({ length: 3 }, (_, i) => (
+            <WaitlistRowSkeleton key={i} />
+          ))}
+        </div>
+      )}
       {isError && <div className="text-sm text-red-600 dark:text-red-400">Failed to load the waitlist.</div>}
 
       {entries && (
@@ -124,33 +158,44 @@ export function WaitlistPage() {
             <div className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">No one is waiting right now.</div>
           ) : (
             <ul className="divide-y divide-gray-100 dark:divide-gray-700">
-              {entries.map((entry) => (
-                <li key={entry.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                  <div>
-                    <div className="font-medium text-gray-900 dark:text-gray-100">
-                      {entry.guestName} · {entry.partySize}
+              <AnimatePresence mode="popLayout" initial={false}>
+                {entries.map((entry) => (
+                  <motion.li
+                    key={entry.id}
+                    layout
+                    variants={listRowVariants}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    transition={{ duration: rowDuration, ease: "easeInOut" }}
+                    className="flex items-center justify-between gap-3 overflow-hidden px-4 py-3"
+                  >
+                    <div>
+                      <div className="font-medium text-gray-900 dark:text-gray-100">
+                        {entry.guestName} · {entry.partySize}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {entry.phone ? `${entry.phone} · ` : ""}
+                        Waiting {minutesSince(entry.addedAt)} min (quoted ~{entry.quotedWaitMinutes} min)
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {entry.phone ? `${entry.phone} · ` : ""}
-                      Waiting {minutesSince(entry.addedAt)} min (quoted ~{entry.quotedWaitMinutes} min)
+                    <div className="flex shrink-0 gap-2">
+                      <button
+                        onClick={() => setSeating(entry)}
+                        className="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-700"
+                      >
+                        Seat now
+                      </button>
+                      <button
+                        onClick={() => cancelEntry.mutate(entry.id)}
+                        className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+                      >
+                        Remove
+                      </button>
                     </div>
-                  </div>
-                  <div className="flex shrink-0 gap-2">
-                    <button
-                      onClick={() => setSeating(entry)}
-                      className="rounded-md bg-accent-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-700"
-                    >
-                      Seat now
-                    </button>
-                    <button
-                      onClick={() => cancelEntry.mutate(entry.id)}
-                      className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </li>
-              ))}
+                  </motion.li>
+                ))}
+              </AnimatePresence>
             </ul>
           )}
         </div>

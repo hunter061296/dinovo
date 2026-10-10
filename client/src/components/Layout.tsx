@@ -1,12 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
+import { Toaster } from "sonner";
 import { AnimatePresence, motion } from "motion/react";
 import { useAuth } from "../lib/AuthContext";
 import type { Role } from "../lib/types";
 import { DURATION, useMotionDuration } from "../lib/motion";
 import { ThemeToggle } from "./ThemeToggle";
 import { QuickSearch } from "./QuickSearch";
+import { SocketToasts } from "./SocketToasts";
 import { ModalCloseButton } from "./Modal";
+
+// Mirrors the dark-mode resolution ThemeContext applies to <html> (mode === "dark", or "system"
+// matching the OS), so toast styling follows the app's manual light/dark/system toggle rather
+// than only the OS preference sonner's own theme="system" would use.
+function useIsDarkMode(): boolean {
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
+  useEffect(() => {
+    const observer = new MutationObserver(() => setIsDark(document.documentElement.classList.contains("dark")));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+  return isDark;
+}
 
 const navItems: { to: string; label: string; roles: Role[] }[] = [
   { to: "/", label: "Dashboard", roles: ["ADMIN", "MANAGER", "HOST"] },
@@ -30,6 +45,7 @@ function HamburgerIcon() {
 
 export function Layout() {
   const { user, logout } = useAuth();
+  const isDark = useIsDarkMode();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const backdropDuration = useMotionDuration(DURATION.fast);
@@ -41,6 +57,10 @@ export function Layout() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-gray-50 dark:bg-gray-900">
+      <SocketToasts />
+      {/* Ambient background-event notifications (see SocketToasts) — short-lived, bottom-right,
+          out of the way of the tablet-width layout's main content. */}
+      <Toaster position="bottom-right" theme={isDark ? "dark" : "light"} duration={4000} />
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800 sm:px-6">
         <div className="flex items-center gap-3">
           <button

@@ -6,6 +6,9 @@ import { usePrefersReducedMotion } from "./useReducedMotion";
 export const DURATION = {
   fast: 0.15,
   normal: 0.2,
+  // Deliberately longer: the floor plan's remote-update pulse needs to read as a noticeable
+  // "something changed" cue, not a UI transition — see FloorPlanPage/TableCard.
+  highlightPulse: 0.6,
 } as const;
 
 // Near-instant rather than zero: prefers-reduced-motion should drop the animated in-between,

@@ -8,6 +8,8 @@ import type { Reservation } from "../../lib/reservations";
 import { minutesToLabel } from "../../lib/reservations";
 import { minutesSince, type WaitlistEntry } from "../../lib/waitlist";
 import { SeatTableModal } from "../SeatTableModal";
+import { markTableSelfUpdated } from "../../lib/selfUpdatedTables";
+import { markWaitlistEntrySelfUpdated } from "../../lib/selfInitiated";
 
 function todayLocalISODate() {
   const d = new Date();
@@ -138,8 +140,10 @@ export function FloorPlanSidePanel({ date, onOpenReservation }: Props) {
   };
 
   const seatReservation = useMutation({
-    mutationFn: ({ id, tableId }: { id: string; tableId: string }) =>
-      api.patch(`/reservations/${id}`, { status: "SEATED", tableId }),
+    mutationFn: ({ id, tableId }: { id: string; tableId: string }) => {
+      markTableSelfUpdated(tableId);
+      return api.patch(`/reservations/${id}`, { status: "SEATED", tableId });
+    },
     onSuccess: () => {
       invalidateAfterSeating();
       setSeatingReservation(null);
@@ -157,7 +161,11 @@ export function FloorPlanSidePanel({ date, onOpenReservation }: Props) {
   });
 
   const seatWaitlistEntry = useMutation({
-    mutationFn: ({ id, tableId }: { id: string; tableId: string }) => api.post(`/waitlist/${id}/seat`, { tableId }),
+    mutationFn: ({ id, tableId }: { id: string; tableId: string }) => {
+      markWaitlistEntrySelfUpdated(id);
+      markTableSelfUpdated(tableId);
+      return api.post(`/waitlist/${id}/seat`, { tableId });
+    },
     onSuccess: () => {
       invalidateAfterSeating();
       setSeatingWaitlistEntry(null);

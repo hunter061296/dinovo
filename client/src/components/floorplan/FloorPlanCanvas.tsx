@@ -4,6 +4,7 @@ import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent, ty
 import { api } from "../../lib/api";
 import type { RestaurantTable, Section } from "../../lib/tables";
 import { snapTablePosition } from "../../lib/floorplanSnap";
+import { markTableSelfUpdated } from "../../lib/selfUpdatedTables";
 import { TableCard } from "./TableCard";
 
 const CANVAS_WIDTH = 900;
@@ -32,6 +33,9 @@ interface Props {
   seatedGuestByTable?: Map<string, string>;
   upcomingByTable?: Map<string, { time: string; guestName: string; at: number }>;
   emptyMessageNoTables: string;
+  // Table ids briefly highlighted after a table:updated arrives from somewhere other than this
+  // screen's own action — see FloorPlanPage.
+  remoteHighlights?: Set<string>;
 }
 
 export function FloorPlanCanvas({
@@ -44,6 +48,7 @@ export function FloorPlanCanvas({
   seatedGuestByTable,
   upcomingByTable,
   emptyMessageNoTables,
+  remoteHighlights,
 }: Props) {
   const queryClient = useQueryClient();
 
@@ -162,6 +167,7 @@ export function FloorPlanCanvas({
         return rest;
       });
 
+    markTableSelfUpdated(table.id);
     const previous = queryClient.getQueryData<RestaurantTable[]>(["tables"]);
     queryClient.setQueryData<RestaurantTable[]>(["tables"], (old) =>
       old?.map((t) => (t.id === table.id ? { ...t, positionX: nextX, positionY: nextY } : t))
@@ -230,6 +236,7 @@ export function FloorPlanCanvas({
                 onClick={() => onTableClick(table)}
                 seatedGuestName={seatedGuestByTable?.get(table.id) ?? null}
                 upcomingReservation={upcomingByTable?.get(table.id) ?? null}
+                remoteHighlight={remoteHighlights?.has(table.id)}
               />
             ))}
           </div>
