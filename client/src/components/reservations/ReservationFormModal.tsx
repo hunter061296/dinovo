@@ -6,6 +6,7 @@ import { GuestPicker } from "./GuestPicker";
 import { useReservationDetailForm } from "./useReservationDetailForm";
 import { ModalBackdrop, ModalCloseButton, ModalPanel } from "../Modal";
 import { TagBadge } from "../TagBadge";
+import { TableAssignSelect } from "./TableAssignSelect";
 
 export type { ReservationFormValues } from "../../lib/reservations";
 
@@ -139,18 +140,24 @@ export function ReservationFormModal({
 
           <label className="mb-3 block text-sm">
             <span className="mb-1 block font-medium text-gray-700 dark:text-gray-300">Table (optional)</span>
-            <select
-              value={f.tableId}
-              onChange={(e) => f.setTableId(e.target.value)}
+            <TableAssignSelect value={f.assignment} onChange={f.setAssignment} partySize={Number(f.partySize) || undefined} />
+          </label>
+
+          <label className="mb-3 block text-sm">
+            <span className="mb-1 block font-medium text-gray-700 dark:text-gray-300">Table time (minutes)</span>
+            <input
+              type="number"
+              min={15}
+              max={480}
+              step={15}
+              value={f.durationMinutes}
+              onChange={(e) => f.setDurationMinutes(e.target.value)}
+              placeholder={initial ? `Turn time: ${initial.effectiveDurationMinutes} min` : "Turn time for this party size"}
               className="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            >
-              <option value="">Unassigned</option>
-              {f.tables?.map((t) => (
-                <option key={t.id} value={t.id}>
-                  Table {t.number} ({t.capacity} seats)
-                </option>
-              ))}
-            </select>
+            />
+            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+              Leave blank to use the configured turn time for this party size and shift.
+            </span>
           </label>
 
           {initial && (

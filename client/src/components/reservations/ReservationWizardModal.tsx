@@ -4,13 +4,14 @@ import { AnimatePresence, motion } from "motion/react";
 import { api } from "../../lib/api";
 import type { Reservation, Shift } from "../../lib/reservations";
 import { minutesToLabel } from "../../lib/reservations";
-import { coversInSlot, findPacingRule } from "../../lib/pacing";
-import type { RestaurantTable } from "../../lib/tables";
+import { coversInSlot, dayOfWeekFor, findPacingRule } from "../../lib/pacing";
 import { GuestPicker, type NewGuestInput } from "./GuestPicker";
 import { MiniCalendar } from "./MiniCalendar";
 import type { ReservationFormValues } from "./ReservationFormModal";
 import { ModalBackdrop, ModalCloseButton, ModalPanel } from "../Modal";
 import { DURATION, useMotionDuration } from "../../lib/motion";
+import { TableAssignSelect } from "./TableAssignSelect";
+import { decodeAssignment } from "../../lib/assignment";
 
 // Slide distance is deliberately small (24px) — this should read as a quick directional cue
 // between steps, not a slide-show transition.
@@ -56,7 +57,7 @@ export function ReservationWizardModal({ initialDate, onSubmit, onClose, submitt
   const [slotMinutes, setSlotMinutes] = useState<number | null>(null);
   const [guest, setGuest] = useState<Reservation["guest"] | null>(null);
   const [newGuest, setNewGuest] = useState<NewGuestInput | null>(null);
-  const [tableId, setTableId] = useState<string>("");
+  const [assignment, setAssignment] = useState<string>("");
   const [notes, setNotes] = useState("");
 
   const step: Step = STEPS[stepIndex];
@@ -69,12 +70,8 @@ export function ReservationWizardModal({ initialDate, onSubmit, onClose, submitt
     queryKey: ["reservations", date],
     queryFn: () => api.get("/reservations", { params: { date } }).then((res) => res.data),
   });
-  const { data: tables } = useQuery<RestaurantTable[]>({
-    queryKey: ["tables"],
-    queryFn: () => api.get("/tables").then((res) => res.data),
-  });
 
-  const dayOfWeek = new Date(`${date}T00:00:00`).getDay();
+  const dayOfWeek = dayOfWeekFor(date);
   const shiftsThatDay = useMemo(() => (shifts ?? []).filter((s) => s.dayOfWeek === dayOfWeek), [shifts, dayOfWeek]);
 
   const timeSlots = useMemo(() => {
@@ -88,7 +85,7 @@ export function ReservationWizardModal({ initialDate, onSubmit, onClose, submitt
   }, [shiftsThatDay]);
 
   function pacingInfoFor(slot: number) {
-    const rule = findPacingRule(shifts ?? [], slot);
+    const rule = findPacingRule(shifts ?? [], slot, dayOfWeek);
     if (!rule) return null;
     const projected = coversInSlot(reservationsThatDay ?? [], slot) + partySize;
     return { rule, projected, overCap: projected > rule.maxCovers, overPartySize: partySize > rule.maxPartySize };
@@ -135,7 +132,7 @@ export function ReservationWizardModal({ initialDate, onSubmit, onClose, submitt
       newGuest: newGuest ?? undefined,
       partySize,
       dateTime: dateTime.toISOString(),
-      tableId: tableId || null,
+      ...decodeAssignment(assignment),
       generalNote: notes,
     });
   }
@@ -288,18 +285,7 @@ export function ReservationWizardModal({ initialDate, onSubmit, onClose, submitt
 
               <label className="block text-sm">
                 <span className="mb-1 block font-medium text-gray-700 dark:text-gray-300">Table (optional)</span>
-                <select
-                  value={tableId}
-                  onChange={(e) => setTableId(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-                >
-                  <option value="">Unassigned</option>
-                  {tables?.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      Table {t.number} ({t.capacity} seats)
-                    </option>
-                  ))}
-                </select>
+                <TableAssignSelect value={assignment} onChange={setAssignment} partySize={partySize} />
               </label>
 
               <label className="block text-sm">

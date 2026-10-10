@@ -4,6 +4,8 @@ import { TableShape, TableStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { authenticate, authorize } from "../middleware/auth";
 import { getIO } from "../lib/socket";
+import { todayISODate, zonedDayBounds } from "../lib/time";
+import { occupiedTableIds } from "../lib/tableAvailability";
 
 const router = Router();
 
@@ -28,14 +30,16 @@ router.get("/seated-summary", async (_req, res) => {
   }
 
   const tableIds = tables.map((t) => t.id);
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+  const { start: todayStart, end: todayEnd } = zonedDayBounds(todayISODate());
 
   const [reservations, waitlistEntries] = await Promise.all([
     prisma.reservation.findMany({
-      where: { tableId: { in: tableIds }, status: "SEATED", dateTime: { gte: todayStart, lt: todayEnd } },
-      include: { guest: true },
+      where: {
+        status: "SEATED",
+        dateTime: { gte: todayStart, lt: todayEnd },
+        OR: [{ tableId: { in: tableIds } }, { combination: { tables: { some: { id: { in: tableIds } } } } }],
+      },
+      include: { guest: true, combination: { include: { tables: true } } },
     }),
     prisma.waitlistEntry.findMany({
       where: { seatedTableId: { in: tableIds }, status: "SEATED" },
@@ -43,7 +47,7 @@ router.get("/seated-summary", async (_req, res) => {
   ]);
 
   const summary = tables.map((t) => {
-    const reservation = reservations.find((r) => r.tableId === t.id);
+    const reservation = reservations.find((r) => occupiedTableIds(r).includes(t.id));
     const waitlistEntry = waitlistEntries.find((w) => w.seatedTableId === t.id);
     return {
       tableId: t.id,

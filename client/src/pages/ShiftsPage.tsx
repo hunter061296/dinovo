@@ -6,6 +6,8 @@ import { DAY_NAMES } from "../lib/pacing";
 import { minutesToLabel } from "../lib/reservations";
 import { ShiftFormModal, type ShiftFormValues } from "../components/shifts/ShiftFormModal";
 import { PacingEditor } from "../components/shifts/PacingEditor";
+import { TurnTimeEditor } from "../components/shifts/TurnTimeEditor";
+import type { TurnTimesResponse } from "../lib/tables";
 
 export function ShiftsPage() {
   const queryClient = useQueryClient();
@@ -16,7 +18,17 @@ export function ShiftsPage() {
 
   const [formModal, setFormModal] = useState<"add" | Shift | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<string | null>(null);
+  // Which shift's panel is open, and whether it's showing pacing or turn times.
+  const [expanded, setExpanded] = useState<{ id: string; panel: "pacing" | "turn" } | null>(null);
+  const { data: turnTimes } = useQuery<TurnTimesResponse>({
+    queryKey: ["turn-times"],
+    queryFn: () => api.get("/turn-times").then((res) => res.data),
+  });
+  const houseRules = (turnTimes?.rules ?? []).filter((r) => r.shiftId === null);
+
+  function toggle(id: string, panel: "pacing" | "turn") {
+    setExpanded((cur) => (cur?.id === id && cur.panel === panel ? null : { id, panel }));
+  }
 
   const createShift = useMutation({
     mutationFn: (values: ShiftFormValues) => api.post("/shifts", values),
@@ -51,7 +63,7 @@ export function ShiftsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Shifts & Pacing</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Define shifts and per-slot cover/party-size caps.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Define shifts, per-slot cover/party-size caps, and turn times.</p>
         </div>
         <button
           onClick={() => setFormModal("add")}
@@ -60,6 +72,19 @@ export function ShiftsPage() {
           Add shift
         </button>
       </div>
+
+      {turnTimes && (
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+          <div className="px-4 py-3">
+            <div className="font-medium text-gray-900 dark:text-gray-100">House turn times</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              How long a party holds its table, by party size. Drives table availability, the grid view, and waitlist quotes. A
+              shift can override these below.
+            </div>
+          </div>
+          <TurnTimeEditor shiftId={null} rules={houseRules} defaultMinutes={turnTimes.defaultMinutes} />
+        </div>
+      )}
 
       {isLoading && <div className="text-sm text-gray-500 dark:text-gray-400">Loading shifts...</div>}
       {isError && <div className="text-sm text-red-600 dark:text-red-400">Failed to load shifts.</div>}
@@ -80,18 +105,26 @@ export function ShiftsPage() {
                     </div>
                   </div>
                   <div className="flex gap-3">
-                    <button
-                      onClick={() => setExpanded(expanded === shift.id ? null : shift.id)}
-                      className="text-xs font-medium text-accent-600 hover:underline"
-                    >
-                      {expanded === shift.id ? "Hide pacing" : "Edit pacing"}
+                    <button onClick={() => toggle(shift.id, "pacing")} className="text-xs font-medium text-accent-600 hover:underline">
+                      {expanded?.id === shift.id && expanded.panel === "pacing" ? "Hide pacing" : "Edit pacing"}
+                    </button>
+                    <button onClick={() => toggle(shift.id, "turn")} className="text-xs font-medium text-accent-600 hover:underline">
+                      {expanded?.id === shift.id && expanded.panel === "turn" ? "Hide turn times" : "Turn times"}
                     </button>
                     <button onClick={() => setFormModal(shift)} className="text-xs font-medium text-gray-600 hover:underline dark:text-gray-400">
                       Edit shift
                     </button>
                   </div>
                 </div>
-                {expanded === shift.id && <PacingEditor shift={shift} />}
+                {expanded?.id === shift.id && expanded.panel === "pacing" && <PacingEditor shift={shift} />}
+                {expanded?.id === shift.id && expanded.panel === "turn" && turnTimes && (
+                  <TurnTimeEditor
+                    shiftId={shift.id}
+                    rules={turnTimes.rules.filter((r) => r.shiftId === shift.id)}
+                    fallbackRules={houseRules}
+                    defaultMinutes={turnTimes.defaultMinutes}
+                  />
+                )}
               </div>
             ))
           )}

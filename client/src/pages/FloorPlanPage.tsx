@@ -7,7 +7,7 @@ import { useAuth } from "../lib/AuthContext";
 import { getSocket } from "../lib/socket";
 import type { RestaurantTable, Section, SeatedSummaryEntry } from "../lib/tables";
 import type { Reservation, ReservationFormValues, Shift } from "../lib/reservations";
-import { minutesToLabel } from "../lib/reservations";
+import { minutesToLabel, reservationTableIds } from "../lib/reservations";
 import { TableStatusPopover } from "../components/floorplan/TableStatusPopover";
 import { FloorPlanSidePanel } from "../components/floorplan/FloorPlanSidePanel";
 import { FloorPlanCanvas } from "../components/floorplan/FloorPlanCanvas";
@@ -76,16 +76,19 @@ export function FloorPlanPage() {
   // "who's coming next".
   const upcomingByTable = new Map<string, { time: string; guestName: string; at: number }>();
   for (const r of dateReservations ?? []) {
-    if (r.status !== "BOOKED" || !r.tableId) continue;
+    if (r.status !== "BOOKED") continue;
     const at = new Date(r.dateTime).getTime();
-    const existing = upcomingByTable.get(r.tableId);
-    if (existing && existing.at <= at) continue;
     const dt = new Date(r.dateTime);
-    upcomingByTable.set(r.tableId, {
-      at,
-      time: minutesToLabel(dt.getHours() * 60 + dt.getMinutes()),
-      guestName: `${r.guest.firstName} ${r.guest.lastName}`,
-    });
+    // A combination's party is "next" at every table it will hold, not just its first one.
+    for (const tableId of reservationTableIds(r)) {
+      const existing = upcomingByTable.get(tableId);
+      if (existing && existing.at <= at) continue;
+      upcomingByTable.set(tableId, {
+        at,
+        time: minutesToLabel(dt.getHours() * 60 + dt.getMinutes()),
+        guestName: `${r.guest.firstName} ${r.guest.lastName}`,
+      });
+    }
   }
 
   // Keeps every open host-stand screen in sync — a status change made on one iPad shows up

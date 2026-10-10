@@ -26,8 +26,10 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+// Generic over the route's params type so a route like `router.patch("/:id", authorize(...), handler)`
+// still infers `req.params.id` as a string in `handler` (a fixed `Request` here would widen it).
 export function authorize(...roles: Role[]) {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return <P>(req: Request<P>, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ error: "Not authenticated" });
     }

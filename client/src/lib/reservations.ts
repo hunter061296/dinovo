@@ -1,4 +1,5 @@
-import type { RestaurantTable } from "./tables";
+import type { RestaurantTable, TableCombination } from "./tables";
+import { combinationLabel } from "./tables";
 
 export type ReservationStatus = "BOOKED" | "SEATED" | "COMPLETED" | "NO_SHOW" | "CANCELLED";
 
@@ -59,6 +60,13 @@ export interface Reservation {
   status: ReservationStatus;
   tableId: string | null;
   table: RestaurantTable | null;
+  // Set when booked on pushed-together tables; `table` is then the combination's first table.
+  combinationId: string | null;
+  combination: TableCombination | null;
+  // Host override of how long the party holds the table; null = the turn-time rule.
+  durationMinutes: number | null;
+  // What the server actually uses: the override, else the turn time for this party and shift.
+  effectiveDurationMinutes: number;
   shiftId: string | null;
   shift: Shift | null;
   tags: string[];
@@ -83,7 +91,9 @@ export interface ReservationFormValues {
   newGuest?: { firstName: string; lastName: string; phone: string; email: string };
   partySize: number;
   dateTime: string; // ISO
-  tableId: string | null;
+  tableId?: string | null;
+  combinationId?: string | null;
+  durationMinutes?: number | null;
   tags?: string[];
   generalNote?: string;
   offerNote?: string;
@@ -116,6 +126,18 @@ export const STATUS_STYLES: Record<ReservationStatus, string> = {
   NO_SHOW: "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/40 dark:text-red-300 dark:border-red-600",
   CANCELLED: "bg-gray-100 text-gray-400 border-gray-200 line-through dark:bg-gray-800 dark:text-gray-500 dark:border-gray-700",
 };
+
+// "Table 4", "Tables 4 + 5" for a combination, or "Unassigned".
+export function reservationTableLabel(r: Pick<Reservation, "table" | "combination">): string {
+  if (r.combination) return `Tables ${combinationLabel(r.combination)}`;
+  return r.table ? `Table ${r.table.number}` : "Unassigned";
+}
+
+// Every table id the reservation holds — all of a combination's tables, or just its own.
+export function reservationTableIds(r: Pick<Reservation, "tableId" | "combination">): string[] {
+  if (r.combination) return r.combination.tables.map((t) => t.id);
+  return r.tableId ? [r.tableId] : [];
+}
 
 export function minutesToLabel(minutes: number): string {
   const h24 = Math.floor(minutes / 60);

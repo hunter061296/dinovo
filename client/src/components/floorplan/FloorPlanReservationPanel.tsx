@@ -5,6 +5,7 @@ import { STATUS_BANNER_STYLES, STATUS_LABELS, SUGGESTED_RESERVATION_TAGS } from 
 import { GuestPicker } from "../reservations/GuestPicker";
 import { useReservationDetailForm } from "../reservations/useReservationDetailForm";
 import { TagBadge } from "../TagBadge";
+import { TableAssignSelect } from "../reservations/TableAssignSelect";
 
 interface Props {
   date: string;
@@ -97,18 +98,7 @@ export function FloorPlanReservationPanel({
               </label>
               <label className="text-sm">
                 <span className="mb-1 block font-medium text-gray-700 dark:text-gray-300">Table (optional)</span>
-                <select
-                  value={f.tableId}
-                  onChange={(e) => f.setTableId(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-                >
-                  <option value="">Unassigned</option>
-                  {f.tables?.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      Table {t.number} ({t.capacity} seats)
-                    </option>
-                  ))}
-                </select>
+                <TableAssignSelect value={f.assignment} onChange={f.setAssignment} partySize={Number(f.partySize) || undefined} />
               </label>
             </div>
 

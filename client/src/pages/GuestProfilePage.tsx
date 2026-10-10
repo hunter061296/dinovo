@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { SUGGESTED_TAGS, type GuestDetail } from "../lib/guests";
-import { STATUS_LABELS, STATUS_STYLES, formatOccasionDate } from "../lib/reservations";
+import { STATUS_LABELS, STATUS_STYLES, formatOccasionDate, reservationTableLabel } from "../lib/reservations";
 import { TagBadge } from "../components/TagBadge";
 
 export function GuestProfilePage() {
@@ -225,7 +225,7 @@ export function GuestProfilePage() {
                     {new Date(r.dateTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Party of {r.partySize} · {r.table ? `Table ${r.table.number}` : "Unassigned"}
+                    Party of {r.partySize} · {reservationTableLabel(r)}
                   </div>
                 </div>
                 <span className={`rounded-md border px-2 py-1 text-xs font-medium ${STATUS_STYLES[r.status]}`}>

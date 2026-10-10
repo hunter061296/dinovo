@@ -40,3 +40,10 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// The `{ error }` message an API failure carries, for showing in a form or modal.
+export function apiErrorMessage(err: unknown, fallback: string): string | null {
+  if (!err) return null;
+  const message = (err as { response?: { data?: { error?: unknown } } }).response?.data?.error;
+  return typeof message === "string" ? message : fallback;
+}

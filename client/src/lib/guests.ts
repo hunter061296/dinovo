@@ -1,5 +1,5 @@
 import type { Guest, ReservationStatus } from "./reservations";
-import type { RestaurantTable } from "./tables";
+import type { RestaurantTable, TableCombination } from "./tables";
 
 export interface VisitHistoryEntry {
   id: string;
@@ -7,6 +7,7 @@ export interface VisitHistoryEntry {
   dateTime: string;
   status: ReservationStatus;
   table: RestaurantTable | null;
+  combination: TableCombination | null;
   notes: string | null;
 }
 

@@ -62,10 +62,12 @@ real is the same fix as above; both endpoints would call the same
 ## Corners cut for MVP speed, phase by phase
 
 - **Auth (Phase 2)**: JWTs aren't revocable before expiry. Deactivating a user
-  blocks new logins and `/auth/me`, but a token already issued stays valid for
-  up to its 12h expiry. Fine for a single trusted location; would want a
-  shorter expiry or a server-side revocation list before this leaves one
-  restaurant's control.
+  blocks new logins, `/auth/me`, and new live-update (Socket.io) connections,
+  but a token already issued stays valid for the rest of the API for up to its
+  12h expiry, and a socket that's already connected stays connected (the token
+  is checked once, at handshake). Fine for a single trusted location; would
+  want a shorter expiry or a server-side revocation list before this leaves
+  one restaurant's control.
 - **Floor plan (Phase 3)**: no collision detection when dragging — tables can
   be dropped on top of each other. The canvas scales to fit a tablet screen
   but doesn't pan/zoom, so a much larger floor plan (50+ tables) would get
@@ -79,18 +81,23 @@ real is the same fix as above; both endpoints would call the same
   of its current live status, since it's for a future time — the server's
   existing double-booking check (`tableAvailability.ts`) is what actually
   guards against a genuine conflict, not anything client-side.
-- **Reservation book (Phase 4)**: table assignment is a plain dropdown, not
-  drag-and-drop onto the floor plan (that interaction lives on the Floor Plan
-  page instead, for table *status*). Assigning the same table to two
-  overlapping reservations is server-enforced (409, see Pacing note below) —
-  not just a client warning.
-- **Live status (Phase 5)**: fully manual — see the POS note above. No
-  visible "reconnecting..." indicator if the Socket.io connection drops
-  (it reconnects automatically, but silently).
-- **Waitlist (Phase 6)**: the quoted-wait estimate uses a fixed 45-minute
-  average turn time rather than one computed from real history — Phase 9
-  already calculates real average turn time, so feeding that back into the
-  estimate is the natural next step.
+- **Reservation book (Phase 4)**: table assignment is a dropdown in the
+  reservation forms, or drag-and-drop on the Grid view (tables down the side,
+  time across the top). Assigning the same table to two overlapping
+  reservations is server-enforced (409, see the turn-time note below) — not
+  just a client warning. The List view widens its slots to fit any
+  reservation booked outside shift hours, so nothing silently drops off it.
+- **Live status (Phase 5)**: fully manual — see the POS note above. A banner
+  shows while the Socket.io connection is down; it reconnects automatically.
+- **Waitlist (Phase 6)**: the quoted wait (`server/src/lib/waitEstimate.ts`)
+  simulates the queue from configured turn times: each suitable table frees up
+  after its turn time minus how long it's been occupied (plus 5 minutes to
+  reset), and parties already waiting claim tables first. Approximations: an
+  occupied table's party size isn't tracked, so its capacity stands in for it;
+  marking a table Ordered resets its `statusUpdatedAt`, so a table that has
+  ordered looks more recently seated than it is; and an open table with a
+  reservation arriving soon still counts as free. Turn times are configured,
+  not learned — Phase 9's measured average turn time could seed them.
 - **Guestbook (Phase 7)**: no merge/dedup tooling if the same person ends up
   with two profiles (e.g. booked once by phone, once by email with a typo).
   No guest deletion. The "browse all" list is capped at 100 with no
@@ -106,13 +113,43 @@ real is the same fix as above; both endpoints would call the same
   pacing.ts`, called from `POST`/`PATCH /api/reservations`), not just in the
   client — it stays a soft warning (`overCap`/`capDetail` on the response),
   matching the client's existing amber-warning UX, since pacing is guidance
-  a host can knowingly override, not a physical constraint. Double-booking a
-  table is a physical constraint instead, so that check (`server/src/lib/
-  tableAvailability.ts`) is a hard 409 block; it uses a flat 90-minute
-  occupancy window around a reservation's `dateTime` rather than a real
-  per-table turn-time setting, since none exists yet (`Reservation.
-  seatedAt`/`completedAt` could inform a real one — see the turn-time note
-  under Reports below).
+  a host can knowingly override, not a physical constraint. Pacing lookups on
+  the client are always scoped to the browsed date's weekday (a shift only
+  applies on its own `dayOfWeek`).
+- **Turn times and table conflicts**: double-booking a table is a physical
+  constraint, so that check (`server/src/lib/tableAvailability.ts`) is a hard
+  409 block. Each reservation holds its table(s) for its own duration: a host
+  override (`Reservation.durationMinutes`, e.g. resized on the Grid view) or
+  the `TurnTime` bracket for its party size — a shift's own brackets if it has
+  any, else the house defaults, else a flat 90 minutes
+  (`server/src/lib/turnTimes.ts`). Brackets are by party size only, not by
+  table or section. The check only re-runs when the table, time, party size
+  or duration actually changes, so editing a note on a reservation that
+  overlaps pre-existing data never gets blocked.
+- **Table combinations**: predefined only (Floor Plan settings → Combined
+  tables) — a host can't push two arbitrary tables together on the fly. A
+  reservation on a combination stores the combination's lowest-numbered table
+  as its `tableId`, so everything that shows "Table N" keeps working; deleting
+  a combination leaves its reservations on that first table. Moving a party
+  that's already seated to a different table doesn't move the table statuses
+  with it — the host re-statuses the tables on the Floor Plan.
+- **Table blocks**: hold a table out of service for a time range (Grid view →
+  Block a table, or tap an empty spot on a table's row). Blocks are checked by
+  the conflict check and by waitlist seat-now, and can't be created on top of
+  an existing booking, but they don't appear on the live Floor Plan, and on
+  the grid they're edited through a form rather than dragged.
+- **Grid view**: cancelled and no-show parties are hidden; completed parties
+  are shown but read-only; a seated party can be given more or less table time
+  but not moved to a new time. Walk-ins seated from the waitlist aren't
+  reservations, so they don't appear on the grid. Times on the grid (like
+  everywhere in the client) are in the device's timezone — see Timezones.
+- **Timezones**: the server computes every calendar day, shift match, pacing
+  slot and report range in `RESTAURANT_TIMEZONE` (`server/src/lib/time.ts`).
+  The client still does its own date math in the device's timezone rather
+  than the restaurant's, so a device set to a different zone shows shifted
+  times — it gets a red warning banner instead (`TimezoneMismatchBanner`).
+  Making the client fully zone-aware would mean routing every `new Date()` /
+  `getHours()` in `client/src` through the restaurant's zone.
 - **Reports (Phase 9)**: average turn time is computed from a
   reservation's own `seatedAt`/`completedAt` timestamps, since there's no
   full table-status audit log to derive it from directly — accurate only as
@@ -133,8 +170,11 @@ real is the same fix as above; both endpoints would call the same
   (`LARGE_PARTY_THRESHOLD`); "short-notice" is booked within 3 hours of the
   reservation time (`SHORT_NOTICE_WINDOW_MS`) — all three are tunable
   assumptions, not derived from a product spec.
-- **General**: single-location only (see Multi-location above); no automated
-  test suite — everything in this build was verified with manual scripted
-  browser passes (Playwright) during development rather than a committed
-  test suite, which would be the first thing to add before a second
-  developer touches this codebase.
+- **General**: single-location only (see Multi-location above). The server
+  has an automated suite (`server/test/`, run with `npm test` against a
+  dedicated `dinovo_test` database): unit tests for the date, turn-time,
+  wait-quote and status-transition logic, and API tests for error handling,
+  timezone-correct day/shift/pacing matching, table conflicts, combinations,
+  blocks, status transitions, waitlist seating, and socket auth. There's no
+  CI wiring yet, and the client has no automated tests — its UI was verified
+  with scripted Playwright passes during development.

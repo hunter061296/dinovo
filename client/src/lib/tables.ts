@@ -113,3 +113,37 @@ export interface SeatedSummaryEntry {
   guestName: string | null;
   partySize: number | null;
 }
+
+// Tables pushed together for a large party (server/prisma/schema.prisma TableCombination).
+export interface TableCombination {
+  id: string;
+  capacity: number;
+  tables: RestaurantTable[]; // ordered by table number
+}
+
+export function combinationLabel(c: Pick<TableCombination, "tables">): string {
+  return c.tables.map((t) => t.number).join(" + ");
+}
+
+// A table held out of service for a time range.
+export interface TableBlock {
+  id: string;
+  tableId: string;
+  table: RestaurantTable;
+  startsAt: string;
+  endsAt: string;
+  reason: string | null;
+  createdBy: { id: string; name: string } | null;
+}
+
+export interface TurnTimeRule {
+  id: string;
+  shiftId: string | null;
+  maxPartySize: number;
+  minutes: number;
+}
+
+export interface TurnTimesResponse {
+  defaultMinutes: number;
+  rules: TurnTimeRule[];
+}

@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence } from "motion/react";
-import { api } from "../lib/api";
+import { api, apiErrorMessage } from "../lib/api";
 import { getSocket } from "../lib/socket";
 import { minutesSince, type WaitlistEntry } from "../lib/waitlist";
 import { SeatTableModal } from "../components/SeatTableModal";
@@ -59,6 +59,7 @@ export function WaitlistPage() {
       queryClient.invalidateQueries({ queryKey: ["waitlist"] });
       queryClient.invalidateQueries({ queryKey: ["tables"] });
       setSeating(null);
+      seatEntry.reset();
     },
   });
 
@@ -164,7 +165,11 @@ export function WaitlistPage() {
             subtitle={`Party of ${seating.partySize} · choose an open table.`}
             partySize={seating.partySize}
             submitting={seatEntry.isPending}
-            onClose={() => setSeating(null)}
+            error={apiErrorMessage(seatEntry.error, "Couldn't seat this party")}
+            onClose={() => {
+              setSeating(null);
+              seatEntry.reset();
+            }}
             onSeat={(tableId) => seatEntry.mutate({ id: seating.id, tableId })}
           />
         )}

@@ -15,11 +15,13 @@ interface Props {
   // Only offered for a Reservation, not a Waitlist entry — assigning a table ahead of time only
   // makes sense for a party with a known future time; a walk-in on the waitlist is already here.
   onPreAssign?: (tableId: string) => void;
+  // The server's reason a seat/pre-assign was refused (table taken, blocked, double-booked).
+  error?: string | null;
 }
 
 type Mode = "preassign" | "seat";
 
-export function SeatTableModal({ title, subtitle, partySize, preferredTableId, onSeat, onClose, submitting, onPreAssign }: Props) {
+export function SeatTableModal({ title, subtitle, partySize, preferredTableId, onSeat, onClose, submitting, onPreAssign, error }: Props) {
   const showTabs = !!onPreAssign;
   const [mode, setMode] = useState<Mode>(showTabs ? "preassign" : "seat");
 
@@ -47,6 +49,7 @@ export function SeatTableModal({ title, subtitle, partySize, preferredTableId, o
           <ModalCloseButton onClick={onClose} />
         </div>
         <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
+        {error && <div className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">{error}</div>}
 
         {showTabs && (
           <div className="mb-4 flex border-b border-gray-200 dark:border-gray-700">

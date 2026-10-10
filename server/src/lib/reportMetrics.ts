@@ -1,5 +1,6 @@
 import { Reservation, Shift } from "@prisma/client";
 import { prisma } from "./prisma";
+import { addDaysToISODate, zonedDayBounds, zonedParts } from "./time";
 
 export interface ReportSummary {
   totalReservations: number;
@@ -36,7 +37,7 @@ export function computeReportSummary(reservations: Reservation[]): ReportSummary
 
   const hourCounts = new Map<number, number>();
   for (const r of reservations) {
-    const hour = r.dateTime.getHours();
+    const hour = zonedParts(r.dateTime).hour;
     hourCounts.set(hour, (hourCounts.get(hour) ?? 0) + 1);
   }
   const reservationsByHour = Array.from(hourCounts.entries())
@@ -55,10 +56,6 @@ const LARGE_PARTY_THRESHOLD = 6;
 // another tunable assumption, not derived from any product spec.
 const SHORT_NOTICE_WINDOW_MS = 3 * 60 * 60 * 1000;
 
-function toISODate(d: Date): string {
-  return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
-}
-
 export interface ShiftOccurrenceMetrics {
   date: string; // YYYY-MM-DD
   totalParties: number;
@@ -75,17 +72,15 @@ export interface ShiftOccurrenceMetrics {
   regularPartyCount: number;
 }
 
-// One occurrence of a recurring Shift (e.g. "this Friday's Dinner shift") on a specific calendar
-// date. Shift itself only stores a dayOfWeek, not a date, so every occurrence is computed fresh
+// One occurrence of a recurring Shift (e.g. "this Friday's Dinner shift") on a specific
+// restaurant calendar date (YYYY-MM-DD, see lib/time.ts). Shift itself only stores a dayOfWeek, not a date, so every occurrence is computed fresh
 // from a (shift, date) pair — used both for "today's" numbers and for each of the trailing
 // weeks' numbers the trend comparison averages over.
 export async function computeShiftOccurrence(
   shift: Pick<Shift, "id" | "startMinutes" | "endMinutes">,
-  date: Date
+  date: string
 ): Promise<ShiftOccurrenceMetrics> {
-  const dayStart = new Date(date);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+  const { start: dayStart, end: dayEnd } = zonedDayBounds(date);
 
   const reservations = await prisma.reservation.findMany({
     where: { shiftId: shift.id, dateTime: { gte: dayStart, lt: dayEnd } },
@@ -111,13 +106,13 @@ export async function computeShiftOccurrence(
   const walkInCovers = walkIns
     .filter((w) => {
       if (!w.seatedAt) return false;
-      const minutes = w.seatedAt.getHours() * 60 + w.seatedAt.getMinutes();
+      const minutes = zonedParts(w.seatedAt).minutesOfDay;
       return minutes >= shift.startMinutes && minutes < shift.endMinutes;
     })
     .reduce((sum, w) => sum + w.partySize, 0);
 
   return {
-    date: toISODate(date),
+    date,
     totalParties,
     totalCovers: reservationCovers + walkInCovers,
     shortNoticeCovers,
@@ -147,12 +142,12 @@ export interface ShiftOverviewResponse {
 // comparison averages over — tunable, called out to the product owner rather than picked silently.
 export const TREND_LOOKBACK_OCCURRENCES = 4;
 
-export async function computeShiftOverview(shift: Shift, date: Date): Promise<ShiftOverviewResponse> {
+export async function computeShiftOverview(shift: Shift, date: string): Promise<ShiftOverviewResponse> {
   const current = await computeShiftOccurrence(shift, date);
 
   const trailingDates = Array.from(
     { length: TREND_LOOKBACK_OCCURRENCES },
-    (_, i) => new Date(date.getTime() - (i + 1) * 7 * 24 * 60 * 60 * 1000)
+    (_, i) => addDaysToISODate(date, -(i + 1) * 7)
   );
   const trailing = await Promise.all(trailingDates.map((d) => computeShiftOccurrence(shift, d)));
 
@@ -161,7 +156,7 @@ export async function computeShiftOverview(shift: Shift, date: Date): Promise<Sh
 
   return {
     shift: { id: shift.id, name: shift.name, dayOfWeek: shift.dayOfWeek },
-    date: toISODate(date),
+    date,
     current,
     trendAverage: {
       totalParties: avg("totalParties"),

@@ -40,6 +40,10 @@ services:
         value: 12h
       - key: CLIENT_ORIGIN
         value: https://dinovo-client.onrender.com
+      # The restaurant's IANA timezone. Render servers run on UTC, and every "which day / which
+      # shift is this reservation" calculation uses this zone — set it to the restaurant's own.
+      - key: RESTAURANT_TIMEZONE
+        value: America/New_York
 
   - type: web
     name: dinovo-client

@@ -6,7 +6,9 @@
 // Also backfills Lunch/Dinner shifts (and their pacing rules) for any of those days that doesn't
 // have them yet — seedData.ts only creates shifts for the single weekday it happened to run on,
 // so most days start with no shift coverage at all.
+import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
+import { addDaysToISODate, dayOfWeekForISODate, todayISODate, zonedDateTime } from "../src/lib/time";
 
 const prisma = new PrismaClient();
 
@@ -56,8 +58,8 @@ async function main() {
     process.exit(1);
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Restaurant calendar days (RESTAURANT_TIMEZONE), not the server's — see src/lib/time.ts.
+  const today = todayISODate();
 
   let guestIdx = 0;
   let tableIdx = 0;
@@ -65,13 +67,12 @@ async function main() {
   const creates: Promise<unknown>[] = [];
 
   for (let dayOffset = 0; dayOffset < DAYS_AHEAD; dayOffset++) {
-    const day = new Date(today.getTime() + dayOffset * 86_400_000);
-    const { lunch, dinner } = await ensureShiftsForDay(day.getDay());
+    const day = addDaysToISODate(today, dayOffset);
+    const { lunch, dinner } = await ensureShiftsForDay(dayOfWeekForISODate(day));
     const isToday = dayOffset === 0;
 
     for (const minutesOfDay of [...LUNCH_TIMES, ...DINNER_TIMES]) {
-      const dateTime = new Date(day);
-      dateTime.setHours(Math.floor(minutesOfDay / 60), minutesOfDay % 60, 0, 0);
+      const dateTime = zonedDateTime(day, minutesOfDay);
 
       // Skip already-passed slots today — every date in this range is today or later, so there's
       // no "past" day to backfill with a completed/cancelled/no-show mix, only this.
@@ -112,8 +113,8 @@ async function main() {
   }
 
   await Promise.all(creates);
-  const lastDay = new Date(today.getTime() + (DAYS_AHEAD - 1) * 86_400_000);
-  console.log(`Created ${creates.length} test reservations across ${today.toDateString()} - ${lastDay.toDateString()}.`);
+  const lastDay = addDaysToISODate(today, DAYS_AHEAD - 1);
+  console.log(`Created ${creates.length} test reservations across ${today} - ${lastDay}.`);
 }
 
 main()
