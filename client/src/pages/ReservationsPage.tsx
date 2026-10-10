@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { api } from "../lib/api";
 import type { Shift } from "../lib/reservations";
@@ -13,6 +14,7 @@ import { DURATION, useMotionDuration } from "../lib/motion";
 import { listChipVariants } from "../lib/listMotion";
 import { markTableSelfUpdated } from "../lib/selfUpdatedTables";
 import { markReservationSelfCreated } from "../lib/selfInitiated";
+import { DateSwitcher, todayLocalISODate } from "../components/DateSwitcher";
 
 function SlotRowSkeleton({ chipWidths }: { chipWidths: number[] }) {
   return (
@@ -30,11 +32,6 @@ function SlotRowSkeleton({ chipWidths }: { chipWidths: number[] }) {
 }
 
 const SLOT_MINUTES = 30;
-
-function todayLocalISODate() {
-  const d = new Date();
-  return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
-}
 
 export function ReservationsPage() {
   const queryClient = useQueryClient();
@@ -126,12 +123,13 @@ export function ReservationsPage() {
           <p className="text-sm text-gray-500 dark:text-gray-400">Day view across all shifts.</p>
         </div>
         <div className="flex items-center gap-3">
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-          />
+          <DateSwitcher date={date} onChange={setDate} />
+          <Link
+            to={`/reservations/print?date=${date}`}
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            Print / Export
+          </Link>
           <button
             onClick={() => setModal("add")}
             className="rounded-md bg-accent-600 px-4 py-2 text-sm font-medium text-white hover:bg-accent-700"

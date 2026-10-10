@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
 import { authenticate, authorize } from "../middleware/auth";
-import { computeReportSummary } from "../lib/reportMetrics";
+import { computeReportSummary, computeShiftOverview } from "../lib/reportMetrics";
 
 const router = Router();
 
@@ -35,6 +35,26 @@ router.get("/summary", async (req, res) => {
   });
 
   res.json(computeReportSummary(reservations));
+});
+
+router.get("/shift-overview", async (req, res) => {
+  const shiftId = typeof req.query.shiftId === "string" ? req.query.shiftId : null;
+  const dateParam = typeof req.query.date === "string" ? req.query.date : null;
+  if (!shiftId || !dateParam || !/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+    return res.status(400).json({ error: "shiftId and date (YYYY-MM-DD) query params are required" });
+  }
+
+  const shift = await prisma.shift.findUnique({ where: { id: shiftId } });
+  if (!shift) {
+    return res.status(404).json({ error: "Shift not found" });
+  }
+
+  const date = new Date(`${dateParam}T00:00:00`);
+  if (date.getDay() !== shift.dayOfWeek) {
+    return res.status(400).json({ error: "The selected date doesn't fall on this shift's day of week" });
+  }
+
+  res.json(await computeShiftOverview(shift, date));
 });
 
 export default router;

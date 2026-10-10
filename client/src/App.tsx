@@ -6,7 +6,9 @@ import { LoginPage } from "./pages/LoginPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { UsersPage } from "./pages/UsersPage";
 import { FloorPlanPage } from "./pages/FloorPlanPage";
+import { FloorPlanSettingsPage } from "./pages/FloorPlanSettingsPage";
 import { ReservationsPage } from "./pages/ReservationsPage";
+import { ReservationsPrintPage } from "./pages/ReservationsPrintPage";
 import { WaitlistPage } from "./pages/WaitlistPage";
 import { GuestbookPage } from "./pages/GuestbookPage";
 import { GuestProfilePage } from "./pages/GuestProfilePage";
@@ -21,6 +23,9 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
 
           <Route element={<ProtectedRoute />}>
+            {/* Deliberately outside <Layout> — no nav/sidebar to hide for a print stylesheet. */}
+            <Route path="/reservations/print" element={<ReservationsPrintPage />} />
+
             <Route element={<Layout />}>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/floor-plan" element={<FloorPlanPage />} />
@@ -30,6 +35,7 @@ export default function App() {
               <Route path="/guests/:id" element={<GuestProfilePage />} />
 
               <Route element={<ProtectedRoute roles={["ADMIN", "MANAGER"]} />}>
+                <Route path="/floor-plan/settings" element={<FloorPlanSettingsPage />} />
                 <Route path="/shifts" element={<ShiftsPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
               </Route>

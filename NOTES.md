@@ -20,6 +20,12 @@ function, call it from the existing endpoint, and store a delivery log
 (a `Notification` table: guestId, channel, status, sentAt) so hosts can see
 whether a message actually went out rather than just trusting a button click.
 
+The Reservation detail panel's "Message guest" button (`POST
+/api/guests/:id/notify`) is the same stub, one level up — it always returns
+`{ success: true, message: "(stub) ..." }` with no SMS/email sent. Making it
+real is the same fix as above; both endpoints would call the same
+`sendGuestNotification` once it exists.
+
 ## Out of scope (and how I'd add them)
 
 - **Public booking widget.** This app is host-facing only. A public booking
@@ -63,7 +69,16 @@ whether a message actually went out rather than just trusting a button click.
 - **Floor plan (Phase 3)**: no collision detection when dragging — tables can
   be dropped on top of each other. The canvas scales to fit a tablet screen
   but doesn't pan/zoom, so a much larger floor plan (50+ tables) would get
-  cramped.
+  cramped. The page's date switcher only scopes the Upcoming reservations
+  list and each table's "who's next" badge — table status colors, the Seated
+  tab, and the Waitlist tab always reflect right now regardless of the
+  browsed date, since there's no historical snapshot of live floor state to
+  look back at (nor a POS to have generated one). "Pre-Assign" (the sidebar's
+  per-row table-assign icon, separate from clicking a guest's name to open
+  their reservation) offers every table big enough for the party regardless
+  of its current live status, since it's for a future time — the server's
+  existing double-booking check (`tableAvailability.ts`) is what actually
+  guards against a genuine conflict, not anything client-side.
 - **Reservation book (Phase 4)**: table assignment is a plain dropdown, not
   drag-and-drop onto the floor plan (that interaction lives on the Floor Plan
   page instead, for table *status*). Assigning the same table to two
@@ -103,6 +118,21 @@ whether a message actually went out rather than just trusting a button click.
   full table-status audit log to derive it from directly — accurate only as
   long as hosts promptly update status. Only Today/This week ranges, no
   custom date range, no export.
+- **Printable reservations list**: no "Payment status" column, unlike OpenTable's — Dinovo has
+  no POS/payment integration, so there's nothing real to put there (flagged on the print page
+  itself, not just here). CSV export and the print view share the same row-building logic
+  (`client/src/lib/reservationsPrint.ts`) so they can't drift apart. The "Notes and tags" column
+  shows the first non-empty of the four Phase-2 note fields, truncated to 60 characters — not all
+  four, to keep the printed row to one line.
+- **Shift Overview report**: "Avg. per-cover spend" and "Total guest spend"
+  show as "— (requires POS integration)" rather than $0 — Dinovo has no
+  POS/payment integration, so there's no guest-spend data to report, faked
+  or otherwise. The trend comparison averages the same metric across the
+  trailing 4 occurrences of that shift (`TREND_LOOKBACK_OCCURRENCES` in
+  `server/src/lib/reportMetrics.ts`); "Large party" is `partySize >= 6`
+  (`LARGE_PARTY_THRESHOLD`); "short-notice" is booked within 3 hours of the
+  reservation time (`SHORT_NOTICE_WINDOW_MS`) — all three are tunable
+  assumptions, not derived from a product spec.
 - **General**: single-location only (see Multi-location above); no automated
   test suite — everything in this build was verified with manual scripted
   browser passes (Playwright) during development rather than a committed
